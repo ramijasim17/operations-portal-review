@@ -1,0 +1,23 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'sqb:job_list' %}">SQB</a> / Manage types</p>
+<h1>SQB Types</h1>
+<table class="data-table">
+  <tr><th>Type</th><th>Parts</th><th></th></tr>
+  {% for t in types %}
+  <tr>
+    <td><a data-modal href="{% url 'sqb:type_detail' t.pk %}">{{ t.name }}</a></td>
+    <td>{{ t.parts.count }}</td>
+    <td>{% if user.profile.can_delete %}<form method="post" action="{% url 'sqb:type_delete' t.pk %}" style="display:inline;">{% csrf_token %}<button class="btn" type="submit" data-confirm="Delete this type?">Delete</button></form>{% endif %}</td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="3">No SQB types yet.</td></tr>
+  {% endfor %}
+</table>
+<h2>New type</h2>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Create</button>
+</form>
+{% endblock %}

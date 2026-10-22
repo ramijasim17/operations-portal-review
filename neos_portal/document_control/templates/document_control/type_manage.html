@@ -1,0 +1,33 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'document_control:list' %}">Document Controller</a> / Document Types</p>
+<h1>Document Types</h1>
+
+
+<div class="table-wrap" style="max-width:480px;">
+<table class="data-table">
+  <tr><th>Name</th><th></th></tr>
+  {% for t in types %}
+  <tr>
+    <td>{{ t.name }}</td>
+    <td>
+      <a data-modal class="btn" href="{% url 'document_control:type_edit' t.pk %}">Edit</a>
+      {% if user.profile.can_delete %}<a class="btn" href="{% url 'document_control:type_delete' t.pk %}">Delete</a>{% endif %}
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="2">No document types yet.</td></tr>
+  {% endfor %}
+</table>
+</div>
+
+<form method="post" style="margin-top:20px; max-width:420px; display:flex; gap:8px; align-items:flex-end;">
+  {% csrf_token %}
+  <div style="flex:1;">
+    <label class="page-sub" style="display:block;">{{ form.name.label }}</label>
+    {{ form.name }}
+    {% if form.name.errors %}<div class="alert alert-error">{{ form.name.errors }}</div>{% endif %}
+  </div>
+  <button class="btn btn-primary" type="submit">Add type</button>
+</form>
+{% endblock %}

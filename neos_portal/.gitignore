@@ -1,0 +1,33 @@
+# Secrets and local config -- never commit these
+.env
+.env.*
+!.env.example
+
+# Local database and uploaded/generated files (production uses PostgreSQL + S3)
+db.sqlite3
+*.sqlite3
+media/
+
+# Python / build output
+venv/
+.venv/
+__pycache__/
+*.pyc
+staticfiles/
+
+# OS / editor junk
+.DS_Store
+.idea/
+.vscode/
+
+# A separate copy of the data for people testing the portal
+tester_copy/
+
+.DS_Store
+**/.DS_Store
+
+# real data export for the Render import -- never commit
+export_for_render/
+
+# copies of the live data -- never commit
+backups/

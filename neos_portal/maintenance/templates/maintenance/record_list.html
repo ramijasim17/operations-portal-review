@@ -1,0 +1,80 @@
+{% extends "core/base.html" %}
+{% load dept %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Maintenance &amp; tests</h1>
+    <p class="page-sub">Level-based servicing, repeating jobs, run-to-failure equipment and pressure tests &mdash; with the next due date worked out for each.</p>
+  </div>
+  <div class="page-head-actions">
+    {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'maintenance:level_manage' %}">Manage levels</a>{% endif %}
+    {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'maintenance:create' %}?activity=pressure_test">+ Pressure test</a>{% endif %}
+    {% if user.profile.can_edit %}<a data-modal class="btn btn-primary" href="{% url 'maintenance:create' %}">+ New maintenance</a>{% endif %}
+  </div>
+</div>
+<div class="dept-bar">{% dept_scope %}</div>
+
+<div class="stat-strip">
+  <div class="stat {% if counts.expired %}stat-bad{% else %}stat-good{% endif %}"><div class="stat-value">{{ counts.expired }}</div><div class="stat-label">overdue</div></div>
+  <div class="stat {% if counts.soon %}stat-warn{% else %}stat-good{% endif %}"><div class="stat-value">{{ counts.soon }}</div><div class="stat-label">due in 30 days</div></div>
+  <div class="stat stat-good"><div class="stat-value">{{ counts.valid }}</div><div class="stat-label">on schedule</div></div>
+  <div class="stat stat-muted"><div class="stat-value">{{ counts.standby }}</div><div class="stat-label">on standby (until it fails)</div></div>
+</div>
+
+<div class="tabs-row">
+  <a href="?tab=all" class="tab-box {% if tab == 'all' %}active{% endif %}">All <span class="tab-count">{{ tab_counts.all }}</span></a>
+  <a href="?tab=levelled" class="tab-box {% if tab == 'levelled' %}active{% endif %}">By level <span class="tab-count">{{ tab_counts.levelled }}</span></a>
+  <a href="?tab=repeating" class="tab-box {% if tab == 'repeating' %}active{% endif %}">Repeating <span class="tab-count">{{ tab_counts.repeating }}</span></a>
+  <a href="?tab=other" class="tab-box {% if tab == 'other' %}active{% endif %}">One-off &amp; on failure <span class="tab-count">{{ tab_counts.other }}</span></a>
+  <a href="?tab=pressure" class="tab-box {% if tab == 'pressure' %}active{% endif %}">Pressure tests <span class="tab-count">{{ tab_counts.pressure }}</span></a>
+  <a href="?tab=done" class="tab-box {% if tab == 'done' %}active{% endif %}">Finished <span class="tab-count">{{ tab_counts.done }}</span></a>
+</div>
+
+<form method="get" class="toolbar">
+  <input type="hidden" name="tab" value="{{ tab }}">
+  <input type="search" name="q" placeholder="Search Asset No / Serial No or location…" value="{{ q }}">
+  <button class="btn" type="submit">Search</button>
+  {% if q %}<a class="btn" href="?tab={{ tab }}">Clear</a>{% endif %}
+</form>
+
+<div class="table-wrap">
+<table class="data-table">
+  <tr><th>Asset</th><th>What</th><th>Schedule</th><th>Last done</th><th>Next due</th><th></th></tr>
+  {% for r in records %}
+  <tr>
+    <td>
+      <div class="cell-title">{% if r.asset_known %}<a href="{% url 'maintenance:history' r.pk %}">{{ r.asset_serial }}</a>{% else %}{{ r.asset_serial }}{% endif %}</div>
+      <div class="cell-sub">{% if r.asset_known %}{{ r.asset_description|default:"" }}{% else %}not found in Departments{% endif %}</div>
+    </td>
+    <td>
+      <span class="pill {% if r.activity == 'pressure_test' %}soon{% endif %}">{{ r.get_activity_display }}</span>
+      <div class="cell-sub">{{ r.place_text }}</div>
+    </td>
+    <td>
+      <div>{{ r.schedule_text }}</div>
+      {% if r.last_result %}<div class="cell-sub">last result: <span class="pill {% if r.last_result == 'Pass' %}valid{% else %}expired{% endif %}">{{ r.last_result }}</span></div>{% endif %}
+    </td>
+    <td>{{ r.last_done|date:"d M Y"|default:"—" }}</td>
+    <td>
+      <span class="pill {{ r.status }}">{% if r.status == 'expired' %}Overdue{% elif r.status == 'soon' %}Due soon{% elif r.status == 'valid' %}On schedule{% elif r.status == 'standby' %}Standby{% elif r.status == 'done' %}Finished{% else %}No date{% endif %}</span>
+      {% if r.due_date %}<div class="cell-sub">{{ r.due_date|date:"d M Y" }}{% if r.days_left is not None %} &middot; {% if r.days_left < 0 %}{{ r.days_left|cut:"-" }} day{{ r.days_left|cut:"-"|pluralize }} ago{% elif r.days_left == 0 %}today{% else %}in {{ r.days_left }} day{{ r.days_left|pluralize }}{% endif %}{% endif %}</div>{% endif %}
+    </td>
+    <td class="actions-cell">
+      {% if user.profile.can_edit and r.is_active %}
+        {% if r.schedule == 'on_failure' and not r.due_date %}
+          <a data-modal class="btn" href="{% url 'maintenance:report_failure' r.pk %}">Log failure</a>
+        {% else %}
+          <a data-modal class="btn btn-primary" href="{% url 'maintenance:complete' r.pk %}">Mark done</a>
+        {% endif %}
+      {% endif %}
+      <a data-modal class="btn" href="{% url 'maintenance:history' r.pk %}">History</a>
+      {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'maintenance:edit' r.pk %}">Edit</a>{% endif %}
+      {% if user.profile.can_delete %}<form method="post" action="{% url 'maintenance:delete' r.pk %}">{% csrf_token %}<button class="btn" type="submit" data-confirm="Delete this record and its history?">Delete</button></form>{% endif %}
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="6" class="dash-empty" style="padding:24px;">{% if q %}Nothing matches “{{ q }}”.{% else %}Nothing here yet.{% endif %}</td></tr>
+  {% endfor %}
+</table>
+</div>
+{% endblock %}

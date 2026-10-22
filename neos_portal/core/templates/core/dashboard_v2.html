@@ -1,0 +1,99 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Dashboard</h1>
+<p class="page-sub">Live status across every module.</p>
+
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 20px;">
+
+  <a href="{% url 'departments:list' %}" style="text-decoration:none; color:inherit;">
+    <div class="nc-card" style="border-left: 3px solid var(--text-accent, #6366f1); transition: transform 0.15s;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <h3 style="margin:0;">Departments</h3>
+        <span style="font-size:28px; font-weight:700;">{{ dept_count }}</span>
+      </div>
+      <p class="page-sub" style="margin:2px 0 14px;">department{{ dept_count|pluralize }} · certificates tracked</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <span class="pill expired">{{ cert_expired }} expired</span>
+        <span class="pill soon">{{ cert_soon }} expiring soon</span>
+      </div>
+    </div>
+  </a>
+
+  <a href="{% url 'action_tracker:list' %}" style="text-decoration:none; color:inherit;">
+    <div class="nc-card" style="border-left: 3px solid var(--text-accent, #6366f1);">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <h3 style="margin:0;">Action Tracker</h3>
+        <span style="font-size:28px; font-weight:700;">{{ action_total }}</span>
+      </div>
+      <p class="page-sub" style="margin:2px 0 14px;">total action{{ action_total|pluralize }}</p>
+      <span class="pill soon">{{ action_pending }} pending / in progress</span>
+    </div>
+  </a>
+
+  <a href="{% url 'job_manager:list' %}" style="text-decoration:none; color:inherit;">
+    <div class="nc-card" style="border-left: 3px solid var(--text-accent, #6366f1);">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <h3 style="margin:0;">Job Manager</h3>
+        <span style="font-size:28px; font-weight:700;">{{ job_total }}</span>
+      </div>
+      <p class="page-sub" style="margin:2px 0 14px;">total job{{ job_total|pluralize }}</p>
+      <span class="pill valid">{{ job_active }} active</span>
+    </div>
+  </a>
+
+  <a href="{% url 'maintenance:list' %}" style="text-decoration:none; color:inherit;">
+    <div class="nc-card" style="border-left: 3px solid var(--text-accent, #6366f1);">
+      <h3 style="margin:0 0 12px;">Maintenance</h3>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <span class="pill expired">{{ maint_overdue }} overdue</span>
+        <span class="pill soon">{{ maint_soon }} due soon</span>
+      </div>
+    </div>
+  </a>
+
+  <a href="{% url 'work_approval:list' %}" style="text-decoration:none; color:inherit;">
+    <div class="nc-card" style="border-left: 3px solid var(--text-accent, #6366f1);">
+      <h3 style="margin:0 0 12px;">Work Approval & SOC</h3>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <span class="pill expired">{{ wa_expired }} expired</span>
+        <span class="pill soon">{{ wa_soon }} expiring soon</span>
+      </div>
+    </div>
+  </a>
+
+  <a href="{% url 'sqb:job_list' %}" style="text-decoration:none; color:inherit;">
+    <div class="nc-card" style="border-left: 3px solid var(--text-accent, #6366f1);">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <h3 style="margin:0;">SQB</h3>
+        <span style="font-size:28px; font-weight:700;">{{ sqb_jobs }}</span>
+      </div>
+      <p class="page-sub" style="margin:2px 0 0;">job{{ sqb_jobs|pluralize }} tracked</p>
+    </div>
+  </a>
+
+  <a href="{% url 'personnel:list' %}" style="text-decoration:none; color:inherit;">
+    <div class="nc-card" style="border-left: 3px solid var(--text-accent, #6366f1);">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <h3 style="margin:0;">Personnel</h3>
+        <span style="font-size:28px; font-weight:700;">{{ personnel_active }}</span>
+      </div>
+      <p class="page-sub" style="margin:2px 0 14px;">active</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <span class="pill expired">{{ personnel_cert_expired }} certs expired</span>
+        <span class="pill soon">{{ personnel_cert_soon }} expiring soon</span>
+      </div>
+    </div>
+  </a>
+
+  <a href="{% url 'daily_report:list' %}" style="text-decoration:none; color:inherit;">
+    <div class="nc-card" style="border-left: 3px solid var(--text-accent, #6366f1);">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <h3 style="margin:0;">Daily Report</h3>
+        <span style="font-size:28px; font-weight:700;">{{ daily_reports_count }}</span>
+      </div>
+      <p class="page-sub" style="margin:2px 0 0;">in the last 30 days</p>
+    </div>
+  </a>
+
+</div>
+{% endblock %}

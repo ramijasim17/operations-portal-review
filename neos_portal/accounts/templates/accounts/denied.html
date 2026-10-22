@@ -1,0 +1,13 @@
+{% extends "core/base.html" %}
+{% block content %}
+<div class="nc-card" style="max-width:560px; margin:40px auto;">
+  <h1 style="margin-top:0;">Access denied</h1>
+  <p class="page-sub">{{ reason }}</p>
+  <p class="page-sub">If you think you should have access, ask an admin to change your role in Access Control.</p>
+  <div style="display:flex; gap:8px; margin-top:16px;">
+    <a class="btn" href="javascript:history.back()">Go back</a>
+    <a class="btn btn-primary" href="{% url 'core:dashboard' %}">Dashboard</a>
+    <form method="post" action="{% url 'accounts:logout' %}" data-noconfirm style="margin:0;">{% csrf_token %}<button type="submit" class="btn">Sign out</button></form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'document_control:list' %}">Document Controller</a> / Edit {{ document.name }}</p>
+<h1>Edit document</h1>
+<form method="post" enctype="multipart/form-data" style="max-width:420px;">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Save</button>
+  <a class="btn" href="{% url 'document_control:list' %}">Cancel</a>
+</form>
+{% endblock %}

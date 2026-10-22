@@ -1,0 +1,25 @@
+{# The single-series chart. Expects `series` and `chart_kpi` (may be None). #}
+<div class="chart">
+  <div class="chart-yaxis">
+    {% for t in series.ticks %}<span class="y-tick" style="bottom:{{ t.bottom }}%;">{{ t.value|floatformat:"-1" }}{% if series.metric == 'percent' %}%{% endif %}</span>{% endfor %}
+  </div>
+  <div class="chart-main">
+    <div class="chart-plot">
+      {% for t in series.ticks %}<div class="chart-grid" style="bottom:{{ t.bottom }}%;"></div>{% endfor %}
+      {% if series.kpi_bottom %}<div class="chart-kpi" style="bottom:{{ series.kpi_bottom }}%;"><span>KPI {{ series.kpi_line|floatformat:"-2" }}{% if series.metric == 'percent' %}%{% else %} h{% endif %}</span></div>{% endif %}
+      {% for b in series.bars %}
+      <div class="chart-col" title="{{ b.title }}: {{ b.value|floatformat:'-2' }}{% if series.metric == 'percent' %}% ({{ b.hours|floatformat:'-1' }} h of {{ b.available|floatformat:'-1' }} h available){% else %} h{% endif %}">
+        {% if b.value %}<span class="chart-val">{{ b.value|floatformat:"-1" }}{% if series.metric == 'percent' %}%{% endif %}</span>{% endif %}
+        <div class="chart-bar {% if b.over %}is-over{% elif series.kpi_line %}is-under{% endif %}" style="height:{{ b.height }}%;"></div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="chart-axis">
+      {% for b in series.bars %}<div class="chart-tick">{{ b.label }}{% if b.sub %}<small>{{ b.sub }}</small>{% endif %}</div>{% endfor %}
+    </div>
+  </div>
+</div>
+<div class="chart-legend">
+  {% if series.kpi_line %}<span><i class="lg lg-under"></i> within KPI</span><span><i class="lg lg-over"></i> above KPI</span><span><i class="lg lg-line"></i> {{ chart_kpi.name }}: {{ chart_kpi.target_text }}</span>
+  {% else %}<span class="cell-sub">No {% if series.metric == 'percent' %}% KPI{% else %}hours KPI{% endif %} matches this view, so no target line is drawn. {% if scoped_kpis %}KPIs exist for {{ scoped_kpis }} &mdash; filter to that unit to see its line.{% else %}Add one under Manage KPIs.{% endif %}</span>{% endif %}
+</div>

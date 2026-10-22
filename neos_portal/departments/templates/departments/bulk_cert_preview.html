@@ -1,0 +1,48 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'departments:list' %}">Departments</a> / Bulk certificate upload / Preview</p>
+
+<dialog open style="border:none; border-radius:12px; padding:0; width:min(90vw, 700px); margin: 40px auto;">
+  <div style="padding:20px;">
+    <h1 style="margin-top:0; font-size:20px;">Preview before saving &mdash; {{ cert_type_name }}</h1>
+
+    <h2>Will be saved ({{ matched|length }})</h2>
+    {% if matched %}
+    <table class="data-table">
+      <tr><th>File</th><th>Asset</th><th>Expiry date</th></tr>
+      {% for m in matched %}
+      <tr>
+        <td>{{ m.file }}</td>
+        <td>{{ m.asset_name }}</td>
+        <td>{{ m.expiry_date }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="page-sub">Nothing matched &mdash; nothing will be saved.</p>
+    {% endif %}
+
+    <h2>Not matched ({{ unmatched|length }})</h2>
+    {% if unmatched %}
+    <table class="data-table">
+      <tr><th>File</th><th>Problem</th></tr>
+      {% for m in unmatched %}
+      <tr>
+        <td>{{ m.file }}</td>
+        <td>{{ m.error }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p class="page-sub">These will be skipped &mdash; fix the filename or the asset's serial number and re-upload them separately if needed.</p>
+    {% else %}
+    <p class="page-sub">Everything matched.</p>
+    {% endif %}
+
+    <form method="post" action="{% url 'departments:bulk_cert_confirm' batch_id %}" style="margin-top:16px;">
+      {% csrf_token %}
+      <button class="btn btn-primary" type="submit" {% if not matched %}disabled{% endif %}>Confirm and save {{ matched|length }} certificate(s)</button>
+      <a class="btn" href="{% url 'departments:bulk_cert_upload' %}">Cancel</a>
+    </form>
+  </div>
+</dialog>
+{% endblock %}

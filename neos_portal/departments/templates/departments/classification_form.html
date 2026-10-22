@@ -1,0 +1,11 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Edit classification</h1>
+<p class="page-sub">{{ classification.department.name }} &middot; {{ classification.name }}</p>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Save</button>
+  <a class="btn" href="{% url 'departments:detail' classification.department_id %}">Cancel</a>
+</form>
+{% endblock %}

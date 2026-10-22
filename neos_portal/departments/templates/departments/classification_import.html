@@ -1,0 +1,26 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub">
+  <a href="{% url 'departments:list' %}">Departments</a> /
+  <a href="{% url 'departments:detail' classification.department.pk %}">{{ classification.department.name }}</a> /
+  <a href="{% url 'departments:classification_detail' classification.pk %}">{{ classification.name }}</a> /
+  Import from Excel
+</p>
+
+<h1>Import assets &mdash; {{ classification.name }}</h1>
+
+
+<ol>
+  <li><a href="{% url 'departments:classification_template' classification.pk %}">Download the template</a> for this classification's current fields (dropdown columns already have their choices built in).</li>
+  <li>Fill in one row per asset. The first column is the asset name/serial number &mdash; required.</li>
+  <li>Upload the filled-in file below.</li>
+</ol>
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <input type="file" name="file" accept=".xlsx" required>
+  <button class="btn btn-primary" type="submit">Import</button>
+</form>
+
+<p class="page-sub" style="margin-top:16px;">Attachment-type fields aren't imported this way &mdash; add those individually after import by editing the asset.</p>
+{% endblock %}

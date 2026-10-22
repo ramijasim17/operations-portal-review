@@ -1,0 +1,65 @@
+{% extends "core/base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Departments</h1>
+    <p class="page-sub">Equipment and tools by department, with the certificate health of everything in them.</p>
+  </div>
+  <div class="page-head-actions">
+    {% include "departments/_bulk_cert_modal.html" %}
+    {% if user.profile.can_edit %}<button type="button" class="btn btn-primary" onclick="document.getElementById('new-department-modal').showModal()">+ New department</button>{% endif %}
+  </div>
+</div>
+
+<div class="stat-strip">
+  <div class="stat"><div class="stat-value">{{ departments|length }}</div><div class="stat-label">departments</div></div>
+  <div class="stat"><div class="stat-value">{{ totals.assets }}</div><div class="stat-label">assets</div></div>
+  <div class="stat {% if totals.away %}stat-warn{% else %}stat-muted{% endif %}"><div class="stat-value">{{ totals.away }}</div><div class="stat-label">out on jobs</div></div>
+  <div class="stat {% if totals.expired %}stat-bad{% else %}stat-good{% endif %}"><div class="stat-value">{{ totals.expired }}</div><div class="stat-label">certificates expired</div></div>
+  <div class="stat {% if totals.soon %}stat-warn{% else %}stat-good{% endif %}"><div class="stat-value">{{ totals.soon }}</div><div class="stat-label">expiring in 30 days</div></div>
+</div>
+
+<div class="dept-grid">
+  {% for d in departments %}
+  <div class="dept-card">
+    <div class="dept-card-head">
+      <div>
+        <h3><a href="{% url 'departments:detail' d.pk %}">{{ d.name }}</a></h3>
+        <div class="cell-sub">{{ d.location|default:"no location" }}</div>
+      </div>
+      <div class="dept-menu">
+        {% if user.profile.can_edit %}<a data-modal class="btn btn-small" href="{% url 'departments:edit' d.pk %}">Edit</a>{% endif %}
+        {% if user.profile.can_delete %}<a class="btn btn-small btn-ghost" href="{% url 'departments:delete' d.pk %}">Delete</a>{% endif %}
+      </div>
+    </div>
+    <div class="dept-metrics">
+      <div><b>{{ d.stats.classifications }}</b><span>classification{{ d.stats.classifications|pluralize }}</span></div>
+      <div><b>{{ d.stats.assets }}</b><span>asset{{ d.stats.assets|pluralize }}</span></div>
+      <div><b>{{ d.stats.away }}</b><span>out on jobs</span></div>
+    </div>
+    <div class="dept-pills">
+      {% if d.stats.expired %}<span class="pill expired">{{ d.stats.expired }} cert{{ d.stats.expired|pluralize }} expired</span>{% endif %}
+      {% if d.stats.soon %}<span class="pill soon">{{ d.stats.soon }} expiring soon</span>{% endif %}
+      {% if not d.stats.certs %}<span class="pill">no certificates recorded</span>{% elif not d.stats.expired and not d.stats.soon %}<span class="pill valid">certificates OK</span>{% endif %}
+    </div>
+    <a class="btn btn-block" href="{% url 'departments:detail' d.pk %}">Open</a>
+  </div>
+  {% empty %}
+  <div class="dash-card"><div class="dash-empty">No departments yet.</div></div>
+  {% endfor %}
+</div>
+
+<dialog id="new-department-modal" style="border:none; border-radius:12px; padding:0; width:min(90vw, 420px);">
+  {% if user.profile.can_edit %}<form method="post" style="padding:20px;">
+    {% csrf_token %}
+    <h2 style="margin-top:0;">New department</h2>
+    {{ form.as_p }}
+    <button class="btn btn-primary" type="submit">Create department</button>
+    <button class="btn" type="button" onclick="document.getElementById('new-department-modal').close()">Cancel</button>
+  </form>{% endif %}
+</dialog>
+
+{% if form.errors %}
+  <script>document.addEventListener("DOMContentLoaded", function() { document.getElementById('new-department-modal').showModal(); });</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,85 @@
+{% extends "core/base.html" %}
+{% block content %}
+<style>
+  .sgs-form-narrow input[type="text"], .sgs-form-narrow select {
+    max-width: 320px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .sgs-form-narrow input[type="file"] { max-width: 320px; }
+  .sgs-form-narrow p { margin: 8px 0; }
+</style>
+<p class="page-sub crumbs"><a href="{% url 'sgs_report:list' %}">SGS Final Reports</a> / Gauge Library</p>
+<h1>Gauge Library</h1>
+<p class="page-sub">Store each gauge's calibration certificate once here — selecting it on a report pulls the certificate in automatically, and tracks battery hours across every job it's used on. To "replace a battery" on a gauge, click Edit and pick the new battery — its hour tracking starts fresh from there.</p>
+
+
+<div class="nc-card" style="margin-bottom:24px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <h2 style="margin:0;">Gauges</h2>
+  </div>
+  <table class="data-table">
+    <tr><th>Serial Number</th><th>Battery</th><th>Draw</th><th>Certificate</th><th></th></tr>
+    {% for g in gauges %}
+    <tr>
+      <td>{{ g.serial_number }}</td>
+      <td>
+        {% if g.battery %}
+          <a href="{% url 'sgs_report:battery_detail' g.battery.pk %}">{{ g.battery.serial_number }}</a>
+          <span class="cell-sub">{{ g.battery.remaining_mah|floatformat:0 }} mAh left</span>
+        {% else %}—{% endif %}
+      </td>
+      <td>{{ g.draw_ma|floatformat:"-2" }} mA</td>
+      <td>{% if user.profile.can_download %}<a href="{{ g.calibration_certificate.url }}" target="_blank">View</a>{% else %}<span class="page-sub">Restricted</span>{% endif %}</td>
+      <td>
+        {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'sgs_report:gauge_edit' g.pk %}">Edit / Replace battery</a>{% endif %}
+        {% if user.profile.can_delete %}<a data-post class="btn" href="{% url 'sgs_report:gauge_delete' g.pk %}" data-confirm="Delete this gauge?">Delete</a>{% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5">No gauges yet.</td></tr>
+    {% endfor %}
+  </table>
+
+  {% if user.profile.can_edit %}<div data-popup-form="new-gauge" data-popup-title="Add a new gauge" data-popup-button="+ Add gauge" style="margin-top:16px;"><form method="post" enctype="multipart/form-data" class="sgs-form-narrow">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button class="btn btn-primary" type="submit" name="add_gauge" value="1">Add gauge</button>
+  </form></div>{% endif %}
+</div>
+
+<div class="nc-card">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <h2 style="margin:0;">Batteries</h2>
+    {% if user.profile.can_download %}<a class="btn" href="{% url 'sgs_report:battery_log_export' %}">Download battery log (Excel)</a>{% endif %}
+  </div>
+  <table class="data-table">
+    <tr><th>Serial Number</th><th>Capacity left</th><th>Hours worked</th><th></th></tr>
+    {% for b in batteries %}
+    <tr>
+      <td>{{ b.serial_number }}</td>
+      <td style="min-width:200px;">
+        <div class="progress"><div class="progress-track"><div class="progress-fill {% if b.is_low %}is-over{% else %}is-done{% endif %}" style="width:{{ b.percent_left|floatformat:0 }}%;"></div></div>
+        <span class="progress-text"><b>{{ b.remaining_mah|floatformat:0 }}</b> / {{ b.capacity_mah|floatformat:0 }} mAh</span></div>
+        {% if b.is_low %}<span class="pill expired">low</span>{% endif %}
+      </td>
+      <td>{{ b.total_hours|floatformat:1 }}</td>
+      <td>
+        <a class="btn" href="{% url 'sgs_report:battery_detail' b.pk %}">View full record</a>
+        {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'sgs_report:battery_edit' b.pk %}">Edit</a>{% endif %}
+        {% if user.profile.can_delete %}<a data-post class="btn" href="{% url 'sgs_report:battery_delete' b.pk %}" data-confirm="Delete this battery?">Delete</a>{% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="4">No batteries yet.</td></tr>
+    {% endfor %}
+  </table>
+
+  {% if user.profile.can_edit %}<div data-popup-form="new-battery" data-popup-title="Add a new battery" data-popup-button="+ Add battery" style="margin-top:16px;"><form method="post" class="sgs-form-narrow">
+    {% csrf_token %}
+    {{ battery_form.as_p }}
+    <button class="btn btn-primary" type="submit" name="add_battery" value="1">Add battery</button>
+  </form></div>{% endif %}
+</div>
+{% endblock %}
+

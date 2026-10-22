@@ -1,0 +1,14 @@
+Django==5.1.4
+psycopg2-binary==2.9.10
+dj-database-url==2.3.0
+python-decouple==3.8
+django-storages==1.14.4
+boto3==1.35.0
+whitenoise==6.8.2
+gunicorn==23.0.0
+reportlab==5.0.1
+openpyxl==3.1.5
+python-docx==1.2.0
+pillow==12.3.0
+pypdf==6.18.1
+matplotlib==3.11.2

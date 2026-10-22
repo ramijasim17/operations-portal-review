@@ -1,0 +1,11 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="/sgs-report/{{ entry.shift.report_id }}/?tab=final">Back to report</a></p>
+<h1>Edit Sequence of Events row (SR {{ entry.sr }})</h1>
+<form method="post" style="max-width:400px;">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Save</button>
+  <a class="btn" href="/sgs-report/{{ entry.shift.report_id }}/?tab=final">Cancel</a>
+</form>
+{% endblock %}

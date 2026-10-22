@@ -1,0 +1,196 @@
+{% extends "core/base.html" %}
+{% load departments_extras approval_tags %}
+{% block content %}
+<p class="page-sub crumbs">
+  <a href="{% url 'departments:detail' classification.department.pk %}">{{ classification.department.name }}</a>
+  / {{ classification.name }}
+</p>
+
+<div class="page-head">
+  <div>
+    <h1>{{ classification.name }}</h1>
+    <p class="page-sub">{{ stats.assets }} asset{{ stats.assets|pluralize }} &middot; {{ field_defs|length }} field{{ field_defs|length|pluralize }} &middot; {{ classification.department.name }}</p>
+  </div>
+  <div class="page-head-actions">
+    {% if user.profile.can_edit %}<button type="button" class="btn" onclick="document.getElementById('fields-modal').showModal()">Configure fields ({{ field_defs|length }})</button>{% endif %}
+    {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'departments:classification_import' classification.pk %}">Import Excel</a>{% endif %}
+    {% if user.profile.can_download %}<a class="btn" href="{% url 'departments:classification_export' classification.pk %}">Export Excel</a>{% endif %}
+    {% if user.profile.can_edit %}<a data-modal class="btn btn-primary" href="{% url 'departments:asset_create' classification.pk %}">+ New asset</a>{% endif %}
+  </div>
+</div>
+
+<div class="stat-strip">
+  <div class="stat"><div class="stat-value">{{ stats.assets }}</div><div class="stat-label">assets</div></div>
+  <div class="stat stat-good"><div class="stat-value">{{ stats.at_workshop }}</div><div class="stat-label">at the workshop</div></div>
+  <div class="stat {% if stats.away %}stat-warn{% else %}stat-muted{% endif %}"><div class="stat-value">{{ stats.away }}</div><div class="stat-label">out on jobs</div></div>
+  {% if classification.is_unit %}<a class="stat {% if npt_month_total %}stat-warn{% else %}stat-good{% endif %}" href="{% url 'sqb:tracker_list' %}?period=this_month" style="text-decoration:none; color:inherit;"><div class="stat-value">{{ npt_month_total|floatformat:"-1" }}<small style="font-size:14px; font-weight:600;"> h</small></div><div class="stat-label">NPT this month &rarr;</div></a>{% endif %}
+  <div class="stat {% if stats.expired %}stat-bad{% else %}stat-good{% endif %}"><div class="stat-value">{{ stats.expired }}</div><div class="stat-label">certificates expired</div></div>
+  <div class="stat {% if stats.soon %}stat-warn{% else %}stat-good{% endif %}"><div class="stat-value">{{ stats.soon }}</div><div class="stat-label">expiring in 30 days</div></div>
+</div>
+
+{% if user.profile.can_edit %}
+<dialog id="fields-modal" style="border:none; border-radius:12px; padding:0; width:min(90vw, 560px); max-height:80vh;">
+  <div style="padding:20px; overflow-y:auto; max-height:80vh;">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="margin:0;">Configure fields — {{ classification.name }}</h2>
+      <button class="btn" type="button" onclick="document.getElementById('fields-modal').close()">Close</button>
+    </div>
+
+    <table class="data-table" style="margin-top:12px;">
+      <tr><th>Label</th><th>Type</th><th>Options</th><th></th></tr>
+      {% for f in field_defs %}
+      <tr>
+        <td>{{ f.label }}</td>
+        <td>{{ f.get_field_type_display }}</td>
+        <td>{{ f.dropdown_options|default:"—" }}</td>
+        <td>
+          {% if user.profile.can_delete %}<a data-post class="btn" href="{% url 'departments:field_delete' f.pk %}" data-confirm="Delete this field? Existing values for it will be lost.">Delete</a>{% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4">No fields yet.</td></tr>
+      {% endfor %}
+    </table>
+
+    <h3>New field</h3>
+    <form method="post">
+      {% csrf_token %}
+      {{ field_form.as_p }}
+      <p class="page-sub">For Dropdown or Searchable fields, list options comma-separated. For Value with unit, list the unit choices instead (e.g. "psi, bbl, ft").</p>
+      <button class="btn btn-primary" type="submit">Add field</button>
+    </form>
+  </div>
+</dialog>
+
+{% if open_fields %}
+<script>document.addEventListener("DOMContentLoaded", function() { document.getElementById('fields-modal').showModal(); });</script>
+{% endif %}
+{% endif %}
+
+<div class="toolbar">
+  <input type="search" id="asset-search" placeholder="Search this table…" oninput="filterAssetRows()">
+  <span class="page-sub" style="margin:0;">Click a column heading to sort.</span>
+  <details class="menu spacer">
+    <summary class="btn">Columns &#9662;</summary>
+    <div class="menu-list" style="padding:10px 12px;">
+      {% for f in field_defs %}
+      <label style="display:flex; gap:8px; align-items:center; padding:3px 0; white-space:nowrap; margin:0; color:var(--text); font-size:13.5px;">
+        <input type="checkbox" class="col-toggle" data-col="col-{{ f.id }}" checked onchange="toggleColumn(this)" style="width:auto;">
+        {{ f.label }}
+      </label>
+      {% empty %}<span class="cell-sub">No extra fields.</span>{% endfor %}
+    </div>
+  </details>
+</div>
+
+{% if user.profile.can_download %}<form method="post" action="{% url 'departments:classification_export_selected' classification.pk %}">
+  {% csrf_token %}{% else %}<div>{% endif %}
+  <div class="table-wrap">
+  <table class="data-table" id="asset-table">
+    <thead>
+      <tr>
+        <th>{% if user.profile.can_download %}<input type="checkbox" id="select-all" checked onchange="toggleAllRows(this)">{% endif %}</th>
+        <th class="sortable" data-sort-index="1" onclick="sortTable(1, this)" style="cursor:pointer;">Asset No / Serial No <span class="sort-arrow"></span></th>
+        <th class="sortable" data-sort-index="2" onclick="sortTable(2, this)" style="cursor:pointer;">Description <span class="sort-arrow"></span></th>
+        <th class="sortable" data-sort-index="3" onclick="sortTable(3, this)" style="cursor:pointer;">Current Location <span class="sort-arrow"></span></th>
+        {% for f in field_defs %}
+        <th class="col-{{ f.id }} sortable" data-sort-index="{{ forloop.counter|add:3 }}" onclick="sortTable({{ forloop.counter|add:3 }}, this)" style="cursor:pointer;">{{ f.label }} <span class="sort-arrow"></span></th>
+        {% endfor %}
+        {% if classification.is_unit %}
+        <th class="sortable" data-sort-index="{{ field_defs|length|add:4 }}" onclick="sortTable({{ field_defs|length|add:4 }}, this)" style="cursor:pointer;">NPT this month <span class="sort-arrow"></span></th>
+        <th class="sortable" data-sort-index="{{ field_defs|length|add:5 }}" onclick="sortTable({{ field_defs|length|add:5 }}, this)" style="cursor:pointer;">NPT total <span class="sort-arrow"></span></th>
+        {% endif %}
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="asset-tbody">
+      {% for row in asset_rows %}
+      <tr class="asset-row">
+        <td>{% if user.profile.can_download %}<input type="checkbox" name="asset_ids" value="{{ row.asset.id }}" class="row-checkbox" checked>{% endif %}</td>
+        <td class="cell-title" style="white-space:nowrap;"><a href="{% url 'departments:asset_detail' row.asset.pk %}" title="Everything about this equipment">{{ row.asset.name }}</a>{% approval_badge row.asset "asset" "asset_removal" %}</td>
+        <td>{{ row.asset.description|default:"—" }}</td>
+        <td><span class="loc-pill {% if row.asset.current_location == 'Workshop' %}loc-workshop{% else %}loc-away{% endif %}">{{ row.asset.current_location }}</span></td>
+        {% for f in field_defs %}<td class="col-{{ f.id }}">{{ row.values|get_item:f.id|default:"—" }}</td>{% endfor %}
+        {% if classification.is_unit %}
+        <td>{% if row.npt_month %}<a href="{% url 'sqb:tracker_list' %}?period=this_month&unit={{ row.asset.pk }}"><b>{{ row.npt_month|floatformat:"-1" }}</b> h</a>{% else %}<span class="cell-sub">0</span>{% endif %}</td>
+        <td>{% if row.npt_total %}<a href="{% url 'sqb:tracker_list' %}?period=this_year&unit={{ row.asset.pk }}">{{ row.npt_total|floatformat:"-1" }} h</a>{% else %}<span class="cell-sub">0</span>{% endif %}</td>
+        {% endif %}
+        <td class="actions-cell">
+          {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'departments:asset_edit' row.asset.pk %}">Edit</a>{% endif %}
+          {% if user.profile.can_delete %}<a data-post class="btn" href="{% url 'departments:asset_delete' row.asset.pk %}" data-confirm="Delete this asset?">Delete</a>{% elif user.profile.can_edit %}<a data-post class="btn" href="{% url 'departments:asset_request_removal' row.asset.pk %}" data-confirm="Ask a Level 3 to remove this asset? It stays until they approve.">Request removal</a>{% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="{{ field_defs|length|add:7 }}">No assets yet. Add fields first if this classification is new.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  {% if user.profile.can_download %}
+  {% for f in field_defs %}
+  <input type="hidden" name="field_ids" value="{{ f.id }}" class="field-id-input" data-col="col-{{ f.id }}">
+  {% endfor %}
+
+  <div class="jm-addbar"><button class="btn btn-primary" type="submit">Export selected to Excel</button></div>
+</form>
+  {% else %}
+</div>
+  {% endif %}
+
+<script>
+function toggleColumn(checkbox) {
+  const cls = checkbox.dataset.col;
+  document.querySelectorAll("." + cls).forEach(el => {
+    el.style.display = checkbox.checked ? "" : "none";
+  });
+  const hiddenInput = document.querySelector('.field-id-input[data-col="' + cls + '"]');
+  if (hiddenInput) hiddenInput.disabled = !checkbox.checked;
+}
+
+function toggleAllRows(selectAllCheckbox) {
+  document.querySelectorAll(".row-checkbox").forEach(cb => {
+    if (cb.closest("tr").style.display !== "none") {
+      cb.checked = selectAllCheckbox.checked;
+    }
+  });
+}
+
+function filterAssetRows() {
+  const term = document.getElementById("asset-search").value.toLowerCase();
+  document.querySelectorAll(".asset-row").forEach(row => {
+    row.style.display = row.textContent.toLowerCase().includes(term) ? "" : "none";
+  });
+}
+
+let sortState = { index: null, ascending: true };
+
+function sortTable(colIndex, headerEl) {
+  const tbody = document.getElementById("asset-tbody");
+  const rows = Array.from(tbody.querySelectorAll(".asset-row"));
+  if (rows.length === 0) return;
+
+  const ascending = sortState.index === colIndex ? !sortState.ascending : true;
+  sortState = { index: colIndex, ascending: ascending };
+
+  document.querySelectorAll(".sort-arrow").forEach(a => a.textContent = "");
+  headerEl.querySelector(".sort-arrow").textContent = ascending ? "\u25b2" : "\u25bc";
+
+  rows.sort((a, b) => {
+    const aText = a.cells[colIndex].textContent.trim();
+    const bText = b.cells[colIndex].textContent.trim();
+    const aNum = parseFloat(aText);
+    const bNum = parseFloat(bText);
+    let cmp;
+    if (!isNaN(aNum) && !isNaN(bNum) && aText !== "\u2014" && bText !== "\u2014") {
+      cmp = aNum - bNum;
+    } else {
+      cmp = aText.localeCompare(bText, undefined, { numeric: true, sensitivity: "base" });
+    }
+    return ascending ? cmp : -cmp;
+  });
+
+  rows.forEach(row => tbody.appendChild(row));
+}
+</script>
+{% endblock %}

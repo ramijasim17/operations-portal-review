@@ -1,0 +1,26 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Edit KPI</h1>
+<form method="post" class="kpi-form">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Save</button>
+  <a class="btn" href="{% url 'sqb:kpi_manage' %}">Cancel</a>
+</form>
+<script>
+(function () {
+  var form = document.querySelector("#kpi-form, form.kpi-form");
+  if (!form) return;
+  var metric = form.querySelector("[name=metric]");
+  var label = form.querySelector("[name=target]").closest("p").querySelector("label");
+  var input = form.querySelector("[name=target]");
+  function update() {
+    var pct = metric.value === "percent";
+    label.textContent = pct ? "Target (the most allowed, % of available hours):" : "Target (the most allowed, hours per month):";
+    input.max = pct ? 100 : "";
+  }
+  metric.addEventListener("change", update);
+  update();
+})();
+</script>
+{% endblock %}

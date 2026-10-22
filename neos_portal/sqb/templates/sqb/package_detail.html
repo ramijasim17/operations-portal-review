@@ -1,0 +1,55 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'sqb:job_list' %}">SQB</a> / {{ package.job_name }}</p>
+<div style="display:flex; justify-content:space-between; align-items:center;">
+  <h1>{{ package.job_name }} — {{ package.sqb_type.name }}</h1>
+  {% if user.profile.can_delete %}<form method="post" action="{% url 'sqb:package_delete' package.pk %}">
+    {% csrf_token %}
+    <button class="btn" type="submit" data-confirm="Delete this entire SQB package and all its uploaded parts? This cannot be undone.">Delete Package</button>
+  </form>{% endif %}
+</div>
+<p class="page-sub">Status: <span class="pill {% if package.status == 'Closed' %}valid{% else %}soon{% endif %}">{{ package.status }}</span></p>
+
+
+<table class="data-table">
+  <tr><th>Part</th><th>File</th><th>Uploaded</th><th></th></tr>
+  {% for part in parts %}
+  <tr>
+    <td>{{ part.part_definition.name }}</td>
+    <td>{% if part.file %}{% if user.profile.can_download %}<a href="{{ part.file.url }}" target="_blank">View PDF</a>{% else %}<span class="page-sub">Restricted</span>{% endif %}{% else %}<span class="page-sub">Not uploaded</span>{% endif %}</td>
+    <td>{{ part.uploaded_date|default:"—" }}</td>
+    <td>
+      {% if package.status == "Open" %}
+        {% if part.part_definition.digital_form_key %}
+        {% if user.profile.can_edit %}<a class="btn" href="{% url 'sqb:fill_digital_form' part.pk %}">{% if part.file %}Edit form{% else %}Fill form{% endif %}</a>{% endif %}
+        {% else %}
+        {% if user.profile.can_edit %}<form method="post" enctype="multipart/form-data" style="display:flex; gap:6px; align-items:center;">
+          {% csrf_token %}
+          <input type="hidden" name="part_id" value="{{ part.pk }}">
+          <input type="file" name="file" accept=".pdf" required>
+          <button class="btn" type="submit">{% if part.file %}Replace{% else %}Upload{% endif %}</button>
+        </form>{% endif %}
+        {% endif %}
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+
+{% if package.status == "Open" %}
+{% if user.profile.can_edit %}<form method="post" action="{% url 'sqb:package_close' package.pk %}" style="margin-top:16px;">
+  {% csrf_token %}
+  <button class="btn btn-primary" type="submit" {% if not package.all_parts_uploaded %}disabled{% endif %} data-confirm="Close this SQB and combine all parts into one PDF? This cannot be undone.">
+    Close SQB & combine into one PDF
+  </button>
+  {% if not package.all_parts_uploaded %}<p class="page-sub">Upload every part before closing.</p>{% endif %}
+</form>{% endif %}
+{% else %}
+<div style="margin-top:16px;">
+  {% if package.combined_file %}
+  {% if user.profile.can_download %}<a class="btn btn-primary" href="{{ package.combined_file.url }}" target="_blank">Download combined PDF</a>{% endif %}
+  {% endif %}
+  <p class="page-sub">Closed {{ package.closed_date }} by {{ package.closed_by|default:"—" }}.</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "core/base.html" %}
+{% block content %}
+{% if renew_from %}
+<h1>Renew &mdash; {{ renew_from.file_type }}</h1>
+<p class="page-sub">{{ renew_from.details|default:"" }}{% if renew_from.expiry_date %} &middot; the current one {% if renew_from.days_left < 0 %}expired{% else %}expires{% endif %} {{ renew_from.expiry_date|date:"j M Y" }}{% endif %}. Enter the new expiry date and attach the new file &mdash; the old record stays as history.</p>
+{% else %}
+<h1>{% if record %}Edit{% else %}New{% endif %} approval / SOC</h1>
+{% endif %}
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">{% if renew_from %}Save renewal{% else %}Save{% endif %}</button>
+  <a class="btn" href="{% url 'work_approval:list' %}">Cancel</a>
+</form>
+{% endblock %}

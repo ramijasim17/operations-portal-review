@@ -1,0 +1,20 @@
+{% extends "core/base_unauthenticated.html" %}
+{% block content %}
+<div class="auth-card">
+  <h1>ABC Operations Portal</h1>
+  <p class="auth-sub">Sign in with your assigned account.</p>
+  {% for error in form.non_field_errors %}
+    <div class="alert alert-error">{{ error }}</div>
+  {% endfor %}
+  <form method="post">
+    {% csrf_token %}
+    <label for="id_username">Employee ID, email or username</label>
+    {{ form.username }}
+    <label for="id_password">Password</label>
+    {{ form.password }}
+    <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+  </form>
+  <a class="auth-link" href="{% url 'accounts:password_reset' %}">Forgot your password?</a>
+  <p class="auth-footnote">Don't have an account? <a href="{% url 'accounts:signup' %}">Create one</a> — new accounts start with View access.</p>
+</div>
+{% endblock %}

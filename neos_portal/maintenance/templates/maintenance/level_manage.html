@@ -1,0 +1,33 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Maintenance levels</h1>
+<p class="page-sub">Give each level how often it is done (for example Level 1 &mdash; every month, Level 2 &mdash; every 3 months, Level 3 &mdash; every 6 months). Records using the level follow it automatically.</p>
+<div class="table-wrap">
+<table class="data-table">
+  <tr><th>Level</th><th>Done</th><th></th></tr>
+  {% for l in levels %}
+  <tr>
+    <td class="cell-title">{{ l.level_name }}</td>
+    <td>{% if l.interval_text %}{{ l.interval_text }}{% else %}<span class="cell-sub">no period set</span>{% endif %}</td>
+    <td class="actions-cell">
+      {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'maintenance:level_edit' l.pk %}">Edit</a>{% endif %}
+      {% if user.profile.can_delete %}<form method="post" action="{% url 'maintenance:level_delete' l.pk %}">{% csrf_token %}<button class="btn" type="submit" data-confirm="Delete this level?">Delete</button></form>{% endif %}
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="3" class="dash-empty" style="padding:18px;">No levels yet.</td></tr>
+  {% endfor %}
+</table>
+</div>
+<h2 style="margin-top:22px;">New level</h2>
+<form method="post" class="level-form">
+  {% csrf_token %}
+  <div class="level-row">
+    <p>{{ form.level_name.label_tag }} {{ form.level_name }}{{ form.level_name.errors }}</p>
+    <p>{{ form.interval_count.label_tag }} {{ form.interval_count }}{{ form.interval_count.errors }}</p>
+    <p><label>&nbsp;</label>{{ form.interval_unit }}</p>
+  </div>
+  <button class="btn btn-primary" type="submit">Add level</button>
+</form>
+<a class="btn" href="{% url 'maintenance:list' %}" style="margin-top:12px; display:inline-block;">Back</a>
+{% endblock %}

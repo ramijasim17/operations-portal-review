@@ -1,0 +1,11 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Corrective action</h1>
+<p class="page-sub">For <strong>{{ obj.reference }}</strong> &middot; {{ obj.title }}. It will also appear in the Action Tracker.</p>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Create action</button>
+  <a class="btn" href="{% url back obj.pk %}">Cancel</a>
+</form>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "core/base.html" %}
+{% load sqb_extras %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'sqb:package_detail' part.package.pk %}">SQB Package</a> / {{ definition.title }}</p>
+<h1>{{ definition.title }}</h1>
+{% if definition.form_ref %}<p class="page-sub">{{ definition.form_ref }}</p>{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+
+  <div class="nc-card" style="max-width:700px; margin-bottom:16px;">
+    {% for key, label, field_type in definition.header_fields %}
+    <div style="margin-bottom:8px;">
+      <label class="page-sub">{{ label }}</label><br>
+      <input type="{{ field_type }}" name="header_{{ key }}" value="{{ entry.header_data|get_item:key|default_if_none:'' }}"
+             style="width:100%; max-width:400px;">
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if definition.items %}
+  <table class="data-table" style="margin-bottom:16px;">
+    <tr><th>#</th><th>Description</th><th>{{ definition.status_columns.0|default:"Pass" }}</th><th>{{ definition.status_columns.1|default:"Fill" }}</th></tr>
+    {% for item in definition.items %}
+    {% with existing=entry.items_data|get_item:forloop.counter0 %}
+    <tr>
+      <td>{{ forloop.counter }}</td>
+      <td>{{ item }}</td>
+      <td><input type="radio" name="item_{{ forloop.counter0 }}_status" value="pass" {% if existing.status == "pass" %}checked{% endif %}></td>
+      <td><input type="radio" name="item_{{ forloop.counter0 }}_status" value="fill" {% if existing.status == "fill" %}checked{% endif %}></td>
+    </tr>
+    {% endwith %}
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  {% for section in definition.sections %}
+  <h2>{{ section.title }}</h2>
+  <table class="data-table" style="margin-bottom:16px;">
+    {% if section.type == "check_comment" %}
+    <tr><th>#</th><th>Description</th><th>Check</th><th>Comment</th></tr>
+    {% for item in section.items %}
+    <tr>
+      <td>{{ forloop.counter }}</td>
+      <td>{{ item }}</td>
+      <td><input type="checkbox" name="item_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}_checked"></td>
+      <td><input type="text" name="item_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}_comment" style="width:100%;"></td>
+    </tr>
+    {% endfor %}
+    {% else %}
+    <tr><th>#</th><th>Description</th><th>Response</th></tr>
+    {% for item in section.items %}
+    <tr>
+      <td>{{ forloop.counter }}</td>
+      <td>{{ item }}</td>
+      <td><input type="text" name="item_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}_response" style="width:100%;"></td>
+    </tr>
+    {% endfor %}
+    {% endif %}
+  </table>
+  {% endfor %}
+
+  <div style="margin-bottom:16px;">
+    <label class="page-sub">Comments</label><br>
+    <textarea name="comments" rows="3" style="width:100%; max-width:700px;">{{ entry.comments }}</textarea>
+  </div>
+
+  <button class="btn btn-primary" type="submit">Save & Generate PDF</button>
+  <a class="btn" href="{% url 'sqb:package_detail' part.package.pk %}">Cancel</a>
+</form>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Cert types</h1>
+<p class="page-sub">Shared across all departments.</p>
+<table class="data-table">
+  <tr><th>Name</th><th></th></tr>
+  {% for ct in cert_types %}
+  <tr>
+    <td>{{ ct.name }}</td>
+    <td>{% if user.profile.can_delete %}<a data-post class="btn" href="{% url 'departments:cert_type_delete' ct.pk %}" data-confirm="Delete this cert type everywhere it is used?">Delete</a>{% endif %}</td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="2">No cert types yet.</td></tr>
+  {% endfor %}
+</table>
+<h2>New cert type</h2>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Create</button>
+</form>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Delete "{{ job.job_name }}"?</h1>
+<p class="page-sub">Equipment records themselves will NOT be deleted, only this job record.</p>
+<form method="post">
+  {% csrf_token %}
+  <button class="btn btn-primary" type="submit">Delete</button>
+  <a class="btn" href="{% url 'job_manager:list' %}">Cancel</a>
+</form>
+{% endblock %}

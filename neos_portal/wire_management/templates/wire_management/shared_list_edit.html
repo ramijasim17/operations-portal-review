@@ -1,0 +1,14 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Rename</h1>
+<p class="page-sub">{{ label }} &middot; currently <strong>{{ obj.name }}</strong>{% if uses %} &middot; the new name will be applied to {{ uses }} existing record{{ uses|pluralize }}{% endif %}.</p>
+<form method="post">
+  {% csrf_token %}
+  {{ form.name }}
+  {% for e in form.name.errors %}<div class="alert alert-error" style="margin-top:8px;">{{ e }}</div>{% endfor %}
+  <div style="margin-top:16px; display:flex; gap:8px;">
+    <button class="btn btn-primary" type="submit" data-confirm="Rename it everywhere it is used?">Save</button>
+    <a class="btn" href="{% url 'wire_management:lists' %}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

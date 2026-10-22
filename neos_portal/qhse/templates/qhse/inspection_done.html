@@ -1,0 +1,11 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Mark as done</h1>
+<p class="page-sub"><strong>{{ item.reference }}</strong> &middot; {{ item.title }}{% if item.repeat_months %} &mdash; the next one is scheduled {{ item.repeat_months }} month{{ item.repeat_months|pluralize }} after the date you enter.{% endif %}</p>
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Record as done</button>
+  <a class="btn" href="{% url 'qhse:inspection_list' %}">Cancel</a>
+</form>
+{% endblock %}

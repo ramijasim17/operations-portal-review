@@ -1,0 +1,42 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Clients, Fields &amp; Locations</h1>
+<p class="page-sub">One list for the whole portal. Job Manager, SGS Reports, SQB and Wire Management all pick from these dropdowns. Renaming an entry updates it everywhere it is used.</p>
+
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(440px, 1fr)); gap:18px; align-items:start;">
+  {% for section in sections %}
+  <div class="nc-card">
+    <h3 style="margin-top:0;">{{ section.label }} <span class="page-sub" style="font-weight:400;">({{ section.entries|length }})</span></h3>
+
+    {% if user.profile.can_edit %}
+    <form method="post" style="display:flex; gap:8px; align-items:flex-start; margin-bottom:14px;">
+      {% csrf_token %}
+      <input type="hidden" name="kind" value="{{ section.kind }}">
+      <div style="flex:1;">
+        {{ section.form.name }}
+        {% for e in section.form.name.errors %}<div class="alert alert-error" style="margin:6px 0 0;">{{ e }}</div>{% endfor %}
+      </div>
+      <button class="btn btn-primary" type="submit" data-confirm="Add this to {{ section.label }}?">Add</button>
+    </form>
+    {% endif %}
+
+    <div class="table-wrap">
+      <table class="data-table">
+        {% for e in section.entries %}
+        <tr>
+          <td>{{ e.obj.name }}{% if e.uses %}<div class="page-sub" style="margin:0; font-size:12px;">used in {{ e.uses }} record{{ e.uses|pluralize }}</div>{% endif %}</td>
+          <td style="text-align:right; white-space:nowrap;">
+            {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'wire_management:list_edit' section.kind e.obj.pk %}">Rename</a>{% endif %}
+            {% if user.profile.can_delete %}<a data-post class="btn" href="{% url 'wire_management:list_delete' section.kind e.obj.pk %}"
+               data-confirm="Delete '{{ e.obj.name }}' from {{ section.label }}?{% if e.uses %} It is used in {{ e.uses }} record{{ e.uses|pluralize }}, which will keep the text but it will no longer appear in dropdowns.{% endif %}">Delete</a>{% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td class="page-sub">Nothing here yet.</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

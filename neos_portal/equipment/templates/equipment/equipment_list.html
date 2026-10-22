@@ -1,0 +1,15 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Equipment</h1>
+<p>{% if user.profile.can_edit %}<a class="btn btn-primary" href="{% url 'equipment:create' %}">+ Add equipment</a>{% endif %}</p>
+<table class="data-table">
+  <thead><tr><th>Serial Number</th><th>Category</th><th>Description</th><th>Location</th></tr></thead>
+  <tbody>
+    {% for item in equipment %}
+    <tr><td>{{ item.serial_number }}</td><td>{{ item.category }}</td><td>{{ item.description }}</td><td>{{ item.location }}</td></tr>
+    {% empty %}
+    <tr><td colspan="4">No equipment yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

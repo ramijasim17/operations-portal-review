@@ -1,0 +1,332 @@
+{% extends "core/base.html" %}
+{% load personnel_extras approval_tags dept %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Personnel</h1>
+    <p class="page-sub">Employees, the courses each one must hold, and their certificates.</p>
+  </div>
+  <div class="page-head-actions">
+    {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'personnel:csv_import' %}">Import CSV</a>{% endif %}
+    {% if user.profile.can_edit %}<a class="btn" href="{% url 'personnel:bulk_cert_upload' %}">Bulk certificates</a>{% endif %}
+    {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'personnel:course_manage' %}">Course names</a>{% endif %}
+    {% if user.profile.can_edit %}<a data-modal class="btn btn-primary" href="{% url 'personnel:create' %}">+ New person</a>{% endif %}
+  </div>
+</div>
+<div class="dept-bar">{% dept_scope %}</div>
+
+<div class="stat-strip">
+  <div class="stat stat-good"><div class="stat-value">{{ stats.active }}</div><div class="stat-label">active employees</div></div>
+  <div class="stat stat-muted"><div class="stat-value">{{ stats.inactive }}</div><div class="stat-label">inactive</div></div>
+  <div class="stat {% if stats.expired %}stat-bad{% else %}stat-good{% endif %}"><div class="stat-value">{{ stats.expired }}</div><div class="stat-label">certificates expired</div></div>
+  <div class="stat {% if stats.soon %}stat-warn{% else %}stat-good{% endif %}"><div class="stat-value">{{ stats.soon }}</div><div class="stat-label">expiring in 30 days</div></div>
+</div>
+
+<div class="tabs-row">
+  <a href="?tab=employees" class="tab-box {% if tab == 'employees' %}active{% endif %}">Employees</a>
+  <a href="?tab=courses" class="tab-box {% if tab == 'courses' %}active{% endif %}">Required courses</a>
+  <a href="?tab=certificates" class="tab-box {% if tab == 'certificates' %}active{% endif %}">Certificates</a>
+</div>
+
+{% if tab == 'employees' %}
+
+  <form method="get" class="toolbar people-toolbar">
+    <input type="hidden" name="tab" value="employees">
+    <input type="hidden" name="view" value="{{ view }}">
+    <input type="search" name="q" placeholder="Search name, ID or position…" value="{{ q }}">
+    <select name="status" onchange="this.form.submit()">
+      <option value="">All statuses</option>
+      <option value="Active" {% if status == "Active" %}selected{% endif %}>Active</option>
+      <option value="Inactive" {% if status == "Inactive" %}selected{% endif %}>Inactive</option>
+    </select>
+    <select name="department" onchange="this.form.submit()">
+      <option value="">All departments</option>
+      {% for d in departments %}<option value="{{ d }}" {% if department == d %}selected{% endif %}>{{ d }}</option>{% endfor %}
+    </select>
+    <select name="position" onchange="this.form.submit()">
+      <option value="">All positions</option>
+      {% for d in positions %}<option value="{{ d }}" {% if position == d %}selected{% endif %}>{{ d }}</option>{% endfor %}
+    </select>
+    <select name="certs" onchange="this.form.submit()">
+      <option value="">Any certificates</option>
+      <option value="expired" {% if cert_state == "expired" %}selected{% endif %}>Has expired</option>
+      <option value="soon" {% if cert_state == "soon" %}selected{% endif %}>Expiring soon</option>
+      <option value="ok" {% if cert_state == "ok" %}selected{% endif %}>All valid</option>
+      <option value="none" {% if cert_state == "none" %}selected{% endif %}>None recorded</option>
+    </select>
+    <select name="sort" onchange="this.form.submit()" title="Order">
+      <option value="name" {% if sort == "name" %}selected{% endif %}>A &ndash; Z</option>
+      <option value="attention" {% if sort == "attention" %}selected{% endif %}>Needs attention first</option>
+    </select>
+    <button class="btn" type="submit">Search</button>
+    {% if filtered %}<a class="btn" href="?tab=employees&view={{ view }}">Clear</a>{% endif %}
+    <span class="view-switch">
+      <a href="?{% for k, v in request.GET.items %}{% if k != 'view' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}view=cards" class="{% if view == 'cards' %}active{% endif %}" title="Cards">&#9638; Cards</a>
+      <a href="?{% for k, v in request.GET.items %}{% if k != 'view' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}view=table" class="{% if view == 'table' %}active{% endif %}" title="Table">&#9776; Table</a>
+    </span>
+  </form>
+  <p class="cell-sub" style="margin:0 0 12px;">{{ people|length }} {% if filtered %}match{% else %}in total{% endif %}</p>
+
+  {% if view == 'cards' %}
+  <div class="people-grid">
+    {% for p in people %}
+    <div class="person-card {% if p.status != 'Active' %}is-inactive{% endif %}">
+      <div class="person-top">
+        <a class="avatar" href="{% url 'personnel:detail' p.pk %}" style="background:{{ p.name|avatar_colour }};">{{ p.name|initials }}</a>
+        <div class="person-id">
+          <a class="person-name" href="{% url 'personnel:detail' p.pk %}">{{ p.name }}</a> {% approval_badge p "personnel" "personnel_removal" %}
+          <div class="cell-sub">{{ p.position|default:"No position" }}</div>
+        </div>
+        {% if p.status != 'Active' %}<span class="pill">Inactive</span>{% endif %}
+      </div>
+      <div class="person-meta">
+        <span title="Employee ID">ID {{ p.employee_id }}</span>
+        {% if p.department %}<span>{{ p.department }}</span>{% endif %}
+        {% if p.on_job %}<span class="pill valid">on a job now</span>{% elif p.job_count %}<span>{{ p.job_count }} job{{ p.job_count|pluralize }} supervised</span>{% endif %}
+      </div>
+      <div class="person-certs">
+        {% if p.cert_total %}
+        <div class="health" title="{{ p.cert_ok }} valid &middot; {{ p.cert_soon }} expiring soon &middot; {{ p.cert_expired }} expired">
+          <span class="h-ok" style="width:{{ p.w_ok }}%;"></span><span class="h-soon" style="width:{{ p.w_soon }}%;"></span><span class="h-bad" style="width:{{ p.w_expired }}%;"></span>
+        </div>
+        <div class="health-text">
+          {% if p.cert_expired %}<span class="pill expired">{{ p.cert_expired }} expired</span>{% endif %}
+          {% if p.cert_soon %}<span class="pill soon">{{ p.cert_soon }} soon</span>{% endif %}
+          {% if p.cert_ok %}<span class="pill valid">{{ p.cert_ok }} valid</span>{% endif %}
+        </div>
+        {% else %}<div class="health"></div><div class="health-text"><span class="cell-sub">No certificates recorded</span></div>{% endif %}
+      </div>
+      <div class="person-actions">
+        <a class="btn" href="{% url 'personnel:detail' p.pk %}">Open</a>
+        {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'personnel:edit' p.pk %}">Edit</a>{% endif %}
+        {% if user.profile.can_delete %}<form method="post" action="{% url 'personnel:delete' p.pk %}">{% csrf_token %}<button class="btn" type="submit" data-confirm="Delete this person?">Delete</button></form>{% endif %}{% if not user.profile.can_delete and user.profile.can_edit %}<form method="post" action="{% url 'personnel:request_removal' p.pk %}">{% csrf_token %}<button class="btn" type="submit" data-confirm="Ask a Level 3 to remove this person? They stay until it is approved.">Request removal</button></form>{% endif %}
+      </div>
+    </div>
+    {% empty %}
+    <div class="dash-card" style="grid-column:1 / -1;"><div class="dash-empty">{% if filtered %}Nobody matches those filters.{% else %}No personnel yet.{% endif %}</div></div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="table-wrap">
+  <table class="data-table" id="personnel-table">
+    <thead>
+      <tr>
+        <th class="sortable" onclick="sortPersonnelTable(0, this)" style="cursor:pointer;">Employee <span class="sort-arrow"></span></th>
+        <th class="sortable" onclick="sortPersonnelTable(1, this)" style="cursor:pointer;">Position <span class="sort-arrow"></span></th>
+        <th class="sortable" onclick="sortPersonnelTable(2, this)" style="cursor:pointer;">Department <span class="sort-arrow"></span></th>
+        <th class="sortable" onclick="sortPersonnelTable(3, this)" style="cursor:pointer;">Status <span class="sort-arrow"></span></th>
+        <th>Certificates</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="personnel-tbody">
+      {% for p in people %}
+      <tr class="personnel-row">
+        <td style="min-width:200px;">
+          <div class="person-top">
+            <a class="avatar avatar-sm" href="{% url 'personnel:detail' p.pk %}" style="background:{{ p.name|avatar_colour }};">{{ p.name|initials }}</a>
+            <div>
+              <div class="cell-title"><a href="{% url 'personnel:detail' p.pk %}">{{ p.name }}</a> {% approval_badge p "personnel" "personnel_removal" %}</div>
+              <div class="cell-sub">ID {{ p.employee_id }}{% if p.on_job %} &middot; <b style="color:var(--success);">on a job now</b>{% elif p.job_count %} &middot; {{ p.job_count }} job{{ p.job_count|pluralize }}{% endif %}</div>
+            </div>
+          </div>
+        </td>
+        <td>{{ p.position|default:"—" }}</td>
+        <td>{{ p.department|default:"—" }}</td>
+        <td><span class="pill {% if p.status == 'Active' %}valid{% endif %}">{{ p.status }}</span></td>
+        <td>
+          {% if p.cert_expired %}<span class="pill expired">{{ p.cert_expired }} expired</span>{% endif %}
+          {% if p.cert_soon %}<span class="pill soon">{{ p.cert_soon }} soon</span>{% endif %}
+          {% if not p.cert_expired and not p.cert_soon %}{% if p.cert_total %}<span class="pill valid">{{ p.cert_total }} OK</span>{% else %}<span class="cell-sub">none recorded</span>{% endif %}{% endif %}
+        </td>
+        <td class="actions-cell" style="white-space:nowrap;">
+          {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'personnel:edit' p.pk %}">Edit</a>{% endif %}
+          {% if user.profile.can_delete %}<form method="post" action="{% url 'personnel:delete' p.pk %}" style="display:inline;">{% csrf_token %}<button class="btn" type="submit" data-confirm="Delete this person?">Delete</button></form>{% endif %}{% if not user.profile.can_delete and user.profile.can_edit %}<form method="post" action="{% url 'personnel:request_removal' p.pk %}" style="display:inline;">{% csrf_token %}<button class="btn" type="submit" data-confirm="Ask a Level 3 to remove this person? They stay until it is approved.">Request removal</button></form>{% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" class="dash-empty" style="padding:24px;">{% if filtered %}Nobody matches those filters.{% else %}No personnel yet.{% endif %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <script>
+  let personnelSortState = { index: null, ascending: true };
+  function sortPersonnelTable(colIndex, headerEl) {
+    const tbody = document.getElementById("personnel-tbody");
+    const rows = Array.from(tbody.querySelectorAll(".personnel-row"));
+    if (rows.length === 0) return;
+    const ascending = personnelSortState.index === colIndex ? !personnelSortState.ascending : true;
+    personnelSortState = { index: colIndex, ascending: ascending };
+    document.querySelectorAll(".sort-arrow").forEach(a => a.textContent = "");
+    headerEl.querySelector(".sort-arrow").textContent = ascending ? "▲" : "▼";
+    rows.sort((a, b) => {
+      const aText = a.cells[colIndex].textContent.trim();
+      const bText = b.cells[colIndex].textContent.trim();
+      const cmp = aText.localeCompare(bText, undefined, { numeric: true, sensitivity: "base" });
+      return ascending ? cmp : -cmp;
+    });
+    rows.forEach(row => tbody.appendChild(row));
+  }
+  </script>
+  {% endif %}
+
+{% elif tab == 'courses' %}
+
+  <p class="page-sub">Check the courses each active employee is required to hold. Unchecked = not required for that person.</p>
+  {% if user.profile.can_edit %}<form method="post" action="{% url 'personnel:required_courses_save' %}">{% else %}<div>{% endif %}
+    {% csrf_token %}
+    <div class="table-wrap"><table class="data-table matrix-table">
+      <tr>
+        <th>Name</th>
+        {% for c in all_courses %}<th style="text-align:center;">{{ c.course_name }}</th>{% endfor %}
+      </tr>
+      {% for p in active_people %}
+      <tr>
+        <td>{{ p.name }}</td>
+        {% for c in all_courses %}
+        <td style="text-align:center;">
+          <input type="checkbox" name="required_{{ p.id }}_{{ c.id }}" {% if c.id in required_map|get_item:p.id %}checked{% endif %}{% if not user.profile.can_edit %} disabled{% endif %}>
+        </td>
+        {% endfor %}
+      </tr>
+      {% empty %}
+      <tr><td colspan="{{ all_courses|length|add:1 }}">No active personnel yet.</td></tr>
+      {% endfor %}
+    </table></div>
+    {% if user.profile.can_edit %}
+    <button class="btn btn-primary" type="submit" style="margin-top:12px;">Save required courses</button>
+  </form>
+  {% else %}
+  </div>
+  {% endif %}
+
+{% elif tab == 'certificates' %}
+
+  <form method="get" class="toolbar people-toolbar" style="margin-top:6px;">
+    <input type="hidden" name="tab" value="certificates">
+    <input type="hidden" name="view" value="{{ view_mode }}">
+    <input type="search" name="q" placeholder="Search name or ID…" value="{{ q }}">
+    <select name="show" onchange="this.form.submit()">
+      <option value="">Everyone</option>
+      <option value="attention" {% if show == "attention" %}selected{% endif %}>Needs attention</option>
+      <option value="expired" {% if show == "expired" %}selected{% endif %}>Has expired</option>
+      <option value="soon" {% if show == "soon" %}selected{% endif %}>Expiring in 30 days</option>
+      <option value="missing" {% if show == "missing" %}selected{% endif %}>Missing a certificate</option>
+    </select>
+    <select name="sort" onchange="this.form.submit()">
+      <option value="attention" {% if sort == "attention" %}selected{% endif %}>Needs attention first</option>
+      <option value="name" {% if sort == "name" %}selected{% endif %}>A &ndash; Z</option>
+    </select>
+    <button class="btn" type="submit">Search</button>
+    {% if cert_filtered %}<a class="btn" href="?tab=certificates&view={{ view_mode }}">Clear</a>{% endif %}
+    <span class="view-switch">
+      <a href="?{% for k, v in request.GET.items %}{% if k != 'view' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}view=matrix" class="{% if view_mode == 'matrix' %}active{% endif %}">&#9638; Matrix</a>
+      <a href="?{% for k, v in request.GET.items %}{% if k != 'view' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}view=cards" class="{% if view_mode == 'cards' %}active{% endif %}">&#9776; Cards</a>
+    </span>
+  </form>
+
+  <div class="mx-legend">
+    <span><i class="mx-dot is-valid"></i> Valid <b>{{ summary.valid }}</b></span>
+    <span><i class="mx-dot is-soon"></i> Expires within 30 days <b>{{ summary.soon }}</b></span>
+    <span><i class="mx-dot is-expired"></i> Expired <b>{{ summary.expired }}</b></span>
+    <span><i class="mx-dot is-missing"></i> Required, no certificate <b>{{ summary.missing }}</b></span>
+    <span><i class="mx-dot is-na"></i> Not required</span>
+    {% if user.profile.can_edit %}<span class="cell-sub">Click a cell to edit or add the certificate.</span>{% endif %}
+  </div>
+
+  {% if view_mode == 'matrix' %}
+  <div class="table-wrap table-sticky cert-matrix-wrap">
+  <table class="data-table cert-matrix">
+    <thead>
+      <tr>
+        <th class="mx-who">Employee</th>
+        {% for c, t in course_totals %}
+        <th class="mx-course" title="{{ c.course_name }}">
+          <div class="mx-course-name">{{ c.course_name }}</div>
+          <div class="mx-course-count">{% if t.expired %}<span class="mx-n is-expired">{{ t.expired }}</span>{% endif %}{% if t.soon %}<span class="mx-n is-soon">{{ t.soon }}</span>{% endif %}{% if t.missing %}<span class="mx-n is-missing">{{ t.missing }}</span>{% endif %}{% if not t.expired and not t.soon and not t.missing %}<span class="mx-n is-valid">&#10003;</span>{% endif %}</div>
+        </th>
+        {% endfor %}
+        <th class="mx-issues">Issues</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in active_people %}
+      <tr>
+        <td class="mx-who"><a href="{% url 'personnel:detail' p.pk %}" class="cell-title">{{ p.name }}</a><div class="cell-sub">{{ p.position|default:"—" }}</div></td>
+        {% for cell in p.cells %}
+        <td class="mx-cell is-{{ cell.kind }}">
+          {% if cell.kind == "na" %}<span class="mx-na">&middot;</span>
+          {% elif cell.kind == "missing" %}
+            {% if user.profile.can_edit %}<a data-modal class="mx-link" href="{% url 'personnel:cert_create' %}?personnel={{ p.id }}&course={{ cell.course.id }}">+ add</a>{% else %}<span class="mx-link">missing</span>{% endif %}
+          {% else %}
+            {% if user.profile.can_edit %}<a data-modal class="mx-link" href="{% url 'personnel:cert_edit' cell.cert.pk %}" title="{{ cell.course.course_name }}">{% if cell.cert.expiry_date %}{{ cell.cert.expiry_date|date:"d M y" }}{% else %}no expiry{% endif %}</a>
+            {% else %}<span class="mx-link">{% if cell.cert.expiry_date %}{{ cell.cert.expiry_date|date:"d M y" }}{% else %}no expiry{% endif %}</span>{% endif %}
+            {% if cell.days is not None and cell.kind != "valid" %}<span class="mx-days">{% if cell.days < 0 %}{{ cell.days|cut:"-" }}d ago{% else %}in {{ cell.days }}d{% endif %}</span>{% endif %}
+            {% if cell.cert.file and user.profile.can_download %}<a class="mx-pdf" href="{{ cell.cert.file.url }}" target="_blank" title="Open the certificate">PDF</a>{% endif %}
+          {% endif %}
+        </td>
+        {% endfor %}
+        <td class="mx-issues">{% if p.issues %}<span class="pill expired">{{ p.issues }}</span>{% else %}<span class="pill valid">&#10003;</span>{% endif %}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="{{ courses|length|add:2 }}" class="dash-empty" style="padding:24px;">{% if cert_filtered %}Nobody matches those filters.{% else %}No active personnel yet.{% endif %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  {% else %}
+
+  {% for p in active_people %}
+  <div class="cert-card">
+    <div class="cert-card-head">
+      <span class="cert-name">{{ p.name }}</span>
+      <span class="cert-pos">{% if p.position %}{{ p.position }} &middot; {% endif %}ID {{ p.employee_id }}</span>
+    </div>
+    <div class="cert-grid">
+      {% for c in p.required_training_courses.all %}
+        {% with cert=certs_by_person|get_item:p.id|get_item:c.id %}
+        <div class="cert-box">
+          <div class="cert-title">{{ c.course_name }}</div>
+          {% if cert %}
+            <div class="cert-meta">
+              <span class="pill {{ cert.status }}">{% if cert.status == "na" %}no expiry{% else %}{{ cert.status }}{% endif %}</span>
+              {% if cert.expiry_date %}<span class="cert-date">{{ cert.expiry_date|date:"d M Y" }}</span>{% endif %}
+            </div>
+            <div class="cert-links">
+              {% if cert.file %}{% if user.profile.can_download %}<a href="{{ cert.file.url }}" target="_blank">PDF</a>{% endif %}{% else %}<span class="cert-date">no file</span>{% endif %}
+              {% if user.profile.can_edit %}<a data-modal href="{% url 'personnel:cert_edit' cert.pk %}">Edit</a>{% endif %}
+            </div>
+          {% else %}
+            {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'personnel:cert_create' %}?personnel={{ p.id }}&course={{ c.id }}">Add certificate</a>{% else %}<span class="cert-date">no certificate</span>{% endif %}
+          {% endif %}
+        </div>
+        {% endwith %}
+      {% empty %}
+        <span class="cell-sub">No required courses set &mdash; add some in the Required courses tab.</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% empty %}
+  <div class="dash-card"><div class="dash-empty">{% if cert_filtered %}Nobody matches those filters.{% else %}No active personnel yet.{% endif %}</div></div>
+  {% endfor %}
+  {% endif %}
+
+  {% if user.profile.can_download %}
+  <details class="cert-zip" style="margin-top:14px;">
+    <summary>Download every employee's certificate for one course (ZIP)</summary>
+    <form method="get" style="display:flex; gap:8px; align-items:flex-end; margin-top:10px; flex-wrap:wrap;" onsubmit="this.action = '/personnel/courses/' + document.getElementById('zip-course-select').value + '/certs-zip/'; return document.getElementById('zip-course-select').value !== '';">
+      <select id="zip-course-select" required style="min-width:240px;">
+        <option value="">Select a course…</option>
+        {% for c in courses %}<option value="{{ c.pk }}">{{ c.course_name }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-primary" type="submit">Download ZIP</button>
+    </form>
+  </details>
+  {% endif %}
+
+{% endif %}
+{% endblock %}

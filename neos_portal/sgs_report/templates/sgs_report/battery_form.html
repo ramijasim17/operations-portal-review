@@ -1,0 +1,11 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Edit battery {{ battery.serial_number }}</h1>
+<p class="page-sub">A full battery holds about 13,000 mAh. If this battery was already used before it was added here, enter what your battery sheet says it had consumed.</p>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Save</button>
+  <a class="btn" href="{% url 'sgs_report:battery_detail' battery.pk %}">Cancel</a>
+</form>
+{% endblock %}

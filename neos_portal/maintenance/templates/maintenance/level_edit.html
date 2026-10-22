@@ -1,0 +1,15 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Edit {{ level.level_name }}</h1>
+<p class="page-sub">How often this level is done. Records that use it pick up the change the next time they are marked done.</p>
+<form method="post" class="level-form">
+  {% csrf_token %}
+  <div class="level-row">
+    <p>{{ form.level_name.label_tag }} {{ form.level_name }}{{ form.level_name.errors }}</p>
+    <p>{{ form.interval_count.label_tag }} {{ form.interval_count }}{{ form.interval_count.errors }}</p>
+    <p><label>&nbsp;</label>{{ form.interval_unit }}</p>
+  </div>
+  <button class="btn btn-primary" type="submit">Save</button>
+  <a class="btn" href="{% url 'maintenance:level_manage' %}">Cancel</a>
+</form>
+{% endblock %}

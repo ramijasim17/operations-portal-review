@@ -1,0 +1,14 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>{% if inv %}Edit {{ inv.reference }}{% else %}Open an investigation{% endif %}</h1>
+{% if links.maintenance_record %}<p class="page-sub">From the {{ links.maintenance_record.get_activity_display|lower }} job for <strong>{{ links.maintenance_record.asset_serial }}</strong>.</p>{% endif %}
+{% if links.action %}<p class="page-sub">From the action: {{ links.action.action_item }}</p>{% endif %}
+{% if links.incident %}<p class="page-sub">From incident {{ links.incident.reference }}.</p>{% endif %}
+<datalist id="asset-serial-list">{% for s in asset_serials %}<option value="{{ s }}">{% endfor %}</datalist>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">{% if inv %}Save{% else %}Open it{% endif %}</button>
+  <a class="btn" href="{% url 'qhse:investigation_list' %}">Cancel</a>
+</form>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "core/base.html" %}
+{% load approval_tags %}
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center;">
+  <h1>Job Manager & Dispatch</h1>
+  {% if user.profile.can_edit %}<a data-modal class="btn btn-primary" href="{% url 'job_manager:create' %}">+ New job</a>{% endif %}
+</div>
+
+
+<form method="get" style="margin: 12px 0;">
+  <input type="text" name="q" placeholder="Search job or client..." value="{{ q }}">
+  <button class="btn" type="submit">Search</button>
+</form>
+
+<table class="data-table">
+  <tr><th>Job #</th><th>Job</th><th>Client</th><th>Department</th><th>Date</th><th>Location</th><th>Status</th><th>Items</th><th></th></tr>
+  {% for job in jobs %}
+  <tr>
+    <td>{{ job.job_number }}</td>
+    <td><a href="{% url 'job_manager:detail' job.pk %}">{{ job.job_name }}</a></td>
+    <td>{{ job.client|default:"—" }}</td>
+    <td>{{ job.department.name|default:"—" }}</td>
+    <td>{{ job.date|default:"—" }}</td>
+    <td>{{ job.location|default:"—" }}</td>
+    <td><span class="pill">{{ job.status }}</span> {% approval_badge job "manifest" %}</td>
+    <td>{{ job.serial_list|length }}</td>
+    <td>
+      {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'job_manager:edit' job.pk %}">Edit</a>{% endif %}
+      {% if user.profile.can_delete %}<a class="btn" href="{% url 'job_manager:delete' job.pk %}">Delete</a>{% endif %}
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="9">No jobs yet.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

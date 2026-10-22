@@ -1,0 +1,61 @@
+{% extends "core/base.html" %}
+{% block title %}{{ t.name }} · Audit templates{% endblock %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'qhse:template_list' %}">Audit templates</a> / {{ t.name }}</p>
+<div class="page-head">
+  <div>
+    <h1>{{ t.name }}</h1>
+    <p class="page-sub"><span class="pill">{{ t.get_kind_display }}</span> <span class="pill">{% if t.department %}{{ t.department.name }}{% else %}All departments{% endif %}</span> <span class="pill {% if t.is_active %}valid{% endif %}">{% if t.is_active %}In use{% else %}Retired{% endif %}</span>
+      &nbsp;pass mark {{ t.pass_mark }}% &middot; {{ parts|length }} part{{ parts|length|pluralize }}, {{ t.point_count }} point{{ t.point_count|pluralize }} &middot; used in {{ used }} audit{{ used|pluralize }}
+      {% if t.description %}<br><span class="cell-sub">{{ t.description }}</span>{% endif %}</p>
+  </div>
+  <div class="page-head-actions">
+    {% if user.profile.can_edit %}<a data-modal class="btn btn-primary" href="{% url 'qhse:inspection_create' %}?template={{ t.pk }}">Use for an audit</a>{% endif %}
+    {% if user.profile.can_approve %}
+      <a data-modal class="btn" href="{% url 'qhse:template_edit' t.pk %}">Edit</a>
+      <form method="post" action="{% url 'qhse:template_copy' t.pk %}" data-noconfirm>{% csrf_token %}<button class="btn" type="submit">Copy</button></form>
+      <form method="post" action="{% url 'qhse:template_delete' t.pk %}">{% csrf_token %}<button class="btn" type="submit" data-confirm="Delete this template? Audits already done from it keep their results.">Delete</button></form>
+    {% endif %}
+  </div>
+</div>
+
+{% for part in parts %}
+<div class="dash-card" style="margin-bottom:14px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+    <h3 style="margin:0;">{{ forloop.counter }}. {{ part.title }} <span class="dash-count">{{ part.points.all|length }}</span></h3>
+    {% if user.profile.can_approve %}
+    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+      <a data-modal class="btn btn-primary" href="{% url 'qhse:point_create' part.pk %}">+ Point</a>
+      <a data-modal class="btn" href="{% url 'qhse:part_edit' part.pk %}">Rename</a>
+      <form method="post" action="{% url 'qhse:move' 'part' part.pk %}" data-noconfirm>{% csrf_token %}<input type="hidden" name="direction" value="up"><button class="btn" type="submit" title="Move up">&uarr;</button></form>
+      <form method="post" action="{% url 'qhse:move' 'part' part.pk %}" data-noconfirm>{% csrf_token %}<input type="hidden" name="direction" value="down"><button class="btn" type="submit" title="Move down">&darr;</button></form>
+      <form method="post" action="{% url 'qhse:part_delete' part.pk %}">{% csrf_token %}<button class="btn" type="submit" data-confirm="Delete this part and all its points?">Delete</button></form>
+    </div>
+    {% endif %}
+  </div>
+  {% for pt in part.points.all %}
+  <div style="display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--border); margin-top:8px; flex-wrap:wrap;">
+    <div style="flex:1 1 320px;">
+      <div class="cell-title">{{ pt.text }} {% if pt.critical %}<span class="pill expired">critical</span>{% endif %}</div>
+      <div class="cell-sub">
+        {% if pt.answer_type == 'number' %}measured: {{ pt.limit_text }}{% else %}compliant / non-compliant / N/A{% endif %}
+        {% if pt.note_required %}&middot; reason needed if it fails{% endif %}
+        {% if pt.guidance %}<br>{{ pt.guidance|truncatechars:140 }}{% endif %}
+      </div>
+    </div>
+    {% if user.profile.can_approve %}
+    <div style="display:flex; gap:6px; align-items:flex-start;">
+      <a data-modal class="btn" href="{% url 'qhse:point_edit' pt.pk %}">Edit</a>
+      <form method="post" action="{% url 'qhse:move' 'point' pt.pk %}" data-noconfirm>{% csrf_token %}<input type="hidden" name="direction" value="up"><button class="btn" type="submit" title="Move up">&uarr;</button></form>
+      <form method="post" action="{% url 'qhse:move' 'point' pt.pk %}" data-noconfirm>{% csrf_token %}<input type="hidden" name="direction" value="down"><button class="btn" type="submit" title="Move down">&darr;</button></form>
+      <form method="post" action="{% url 'qhse:point_delete' pt.pk %}">{% csrf_token %}<button class="btn" type="submit" data-confirm="Delete this point?">Delete</button></form>
+    </div>
+    {% endif %}
+  </div>
+  {% empty %}<p class="dash-empty" style="margin-top:8px;">No points in this part yet.</p>{% endfor %}
+</div>
+{% empty %}
+<div class="dash-card"><p class="dash-empty">No parts yet.{% if user.profile.can_approve %} Add a part (for example "Lifting" or "Housekeeping"), then the points to check in it.{% endif %}</p></div>
+{% endfor %}
+{% if user.profile.can_approve %}<p><a data-modal class="btn btn-primary" href="{% url 'qhse:part_create' t.pk %}">+ Add a part</a></p>{% endif %}
+{% endblock %}

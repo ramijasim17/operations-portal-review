@@ -1,0 +1,10 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Delete document type "{{ doc_type.name }}"?</h1>
+<p class="page-sub">This can't be undone. If any documents still use this type, the delete will be blocked instead of leaving them without one.</p>
+<form method="post">
+  {% csrf_token %}
+  <button class="btn btn-primary" type="submit">Yes, delete it</button>
+  <a data-modal class="btn" href="{% url 'document_control:type_manage' %}">Cancel</a>
+</form>
+{% endblock %}

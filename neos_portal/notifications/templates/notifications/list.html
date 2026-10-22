@@ -1,0 +1,43 @@
+{% extends "core/base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Notifications</h1>
+    <p class="page-sub">What other people added, uploaded or changed{% if not user.profile.notify_all %} (switch on in Access Control to receive these){% endif %}, and what was assigned to you.</p>
+  </div>
+  <div class="page-head-actions">
+    {% if unread %}<form method="post" action="{% url 'notifications:read_all' %}" data-noconfirm>{% csrf_token %}<button class="btn" type="submit">Mark all as read</button></form>{% endif %}
+  </div>
+</div>
+
+<div class="stat-strip">
+  <div class="stat {% if unread %}stat-warn{% else %}stat-good{% endif %}"><div class="stat-value">{{ unread }}</div><div class="stat-label">unread</div></div>
+  <div class="stat {% if assigned_unread %}stat-bad{% else %}stat-muted{% endif %}"><div class="stat-value">{{ assigned_unread }}</div><div class="stat-label">assigned to you &middot; unread</div></div>
+  <div class="stat stat-muted"><div class="stat-value">{{ total }}</div><div class="stat-label">in total</div></div>
+</div>
+
+<div class="tabs-row">
+  <a href="?show=all{% if kind %}&kind={{ kind }}{% endif %}" class="tab-box {% if show != 'unread' %}active{% endif %}">All</a>
+  <a href="?show=unread{% if kind %}&kind={{ kind }}{% endif %}" class="tab-box {% if show == 'unread' %}active{% endif %}">Unread <span class="tab-count">{{ unread }}</span></a>
+  <a href="?show={{ show }}&kind=assigned" class="tab-box {% if kind == 'assigned' %}active{% endif %}">Assigned to me</a>
+  <a href="?show={{ show }}&kind=approval" class="tab-box {% if kind == 'approval' %}active{% endif %}">Approvals</a>
+  <a href="?show={{ show }}&kind=activity" class="tab-box {% if kind == 'activity' %}active{% endif %}">Changes</a>
+</div>
+
+<div class="notif-list">
+  {% for n in rows %}
+  <a class="notif {% if n.is_unread %}is-unread{% endif %} notif-{{ n.kind }}" href="{% url 'notifications:open' n.pk %}">
+    <span class="notif-dot"></span>
+    <span class="notif-body">
+      <span class="notif-msg">{{ n.message }}</span>
+      <span class="notif-meta">
+        {% if n.kind == 'assigned' %}<span class="pill soon">assigned to you</span>{% elif n.kind == 'approval' %}<span class="pill soon">approval</span>{% endif %}
+        {{ n.updated_at|timesince }} ago{% if n.count > 1 %} &middot; {{ n.count }} changes{% endif %}
+      </span>
+    </span>
+  </a>
+  {% empty %}
+  <div class="dash-card"><div class="dash-empty">{% if show == 'unread' %}You're all caught up.{% else %}Nothing yet.{% endif %}</div></div>
+  {% endfor %}
+</div>
+{% endblock %}

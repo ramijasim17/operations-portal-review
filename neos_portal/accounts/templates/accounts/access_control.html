@@ -1,0 +1,74 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Access Control</h1>
+<p class="page-sub">Manage what each account can do. New sign-ups start at View until upgraded here.</p>
+
+
+<p class="cell-sub" style="margin:-12px 0 14px;">{{ profiles|length }} account{{ profiles|length|pluralize }} &middot; <span class="online-chip"><span class="online-dot"></span>{{ online_count }} online now</span></p>
+
+<div class="table-wrap">
+<table class="data-table ac-table">
+  <tr><th>Person</th><th>Level</th><th>Alerts</th><th>Status</th><th></th></tr>
+  {% for p in profiles %}
+  <tr>
+    <td class="ac-person">
+      <div class="cell-title">{{ p.display_name }}</div>
+      <div class="cell-sub">@{{ p.user.username }}{% if p.user.email %} &middot; {{ p.user.email }}{% endif %}</div>
+      <details class="ac-link">
+        <summary>{% if p.employee %}Employee ID {{ p.employee.employee_id }} &middot; Change employee{% else %}Not linked to an employee &middot; Link employee{% endif %}</summary>
+        <form method="post">
+          {% csrf_token %}<input type="hidden" name="profile_id" value="{{ p.pk }}">
+          <select name="employee">
+            <option value="">— not linked —</option>
+            {% for e in employees %}<option value="{{ e.pk }}" {% if p.employee_id == e.pk %}selected{% endif %}>{{ e.name }} — ID {{ e.employee_id }}</option>{% endfor %}
+          </select>
+          <button class="btn btn-small" type="submit" name="link_employee" value="1">Save</button>
+        </form>
+      </details>
+    </td>
+    <td>
+      <form method="post" class="ac-inline" data-confirm="Change this account's level?">
+        {% csrf_token %}
+        <input type="hidden" name="profile_id" value="{{ p.pk }}">
+        <select name="role" aria-label="Level for {{ p.user.username }}">
+          {% for value, label in roles %}
+          <option value="{{ value }}" {% if p.role == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-small">Save</button>
+      </form>
+    </td>
+    <td>
+      <form method="post">{% csrf_token %}<input type="hidden" name="profile_id" value="{{ p.pk }}">
+        <button class="btn btn-small {% if p.notify_all %}btn-primary{% endif %}" type="submit" name="toggle_notify" value="1">{% if p.notify_all %}On{% else %}Off{% endif %}</button>
+      </form>
+    </td>
+    <td class="ac-status">
+      {% if p.is_active_employee %}<span class="pill valid">Active</span>{% else %}<span class="pill expired">Blocked</span>{% endif %}
+      <div>{% if p.is_online %}<span class="online-chip"><span class="online-dot"></span>Online</span>{% elif p.last_seen %}<span class="cell-sub">seen {{ p.seen_ago }} ago</span>{% else %}<span class="cell-sub">never opened</span>{% endif %}</div>
+    </td>
+    <td class="ac-actions">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="profile_id" value="{{ p.pk }}">
+        <button type="submit" name="toggle_active" value="1" class="btn btn-small" data-confirm="{% if p.is_active_employee %}Block {{ p.user.username }} from signing in?{% else %}Allow {{ p.user.username }} to sign in again?{% endif %}">
+          {% if p.is_active_employee %}Deactivate{% else %}Reactivate{% endif %}
+        </button>
+      </form>
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="5">No accounts yet.</td></tr>
+  {% endfor %}
+</table>
+</div>
+
+<div class="nc-card" style="margin-top:20px; max-width:720px;">
+  <h3 style="margin-top:0;">What each level can do</h3>
+  <p class="page-sub" style="margin:4px 0;"><strong>Level 1 &mdash; View</strong>: sees everything; can't add, edit, download or approve.</p>
+  <p class="page-sub" style="margin:4px 0;"><strong>Level 2 &mdash; Add &amp; edit</strong>: sees everything; can add, edit and download. What it adds (manifests, assets, personnel, SGS reports, maintenance reports) waits for a Level 3 to approve it, and removals are requests.</p>
+  <p class="page-sub" style="margin:4px 0;"><strong>Level 3 &mdash; Approve</strong>: everything Level 2 can, and approves or rejects the work waiting in <b>Approvals</b>, removes records, and approves removal requests. Its own work is approved automatically.</p>
+  <p class="page-sub" style="margin:4px 0;"><strong>Admin</strong>: Level 3, plus this page (accounts and levels).</p>
+  <p class="page-sub" style="margin:10px 0 4px;"><strong>Every-change alerts</strong> &mdash; switch on for a manager to be notified of everything other people add, upload, change or delete. <strong>Linking</strong> an account to its employee lets it receive &ldquo;assigned to you&rdquo; alerts.</p>
+</div>
+{% endblock %}

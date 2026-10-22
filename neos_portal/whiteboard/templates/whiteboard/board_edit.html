@@ -1,0 +1,68 @@
+{% extends "core/base.html" %}
+{% load static %}
+{% block title %}{{ board.title }} · Whiteboard{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'whiteboard/whiteboard.css' %}?v={{ asset_version }}">
+<p class="page-sub crumbs"><a href="{% url 'whiteboard:list' %}">My Whiteboard</a> / <span id="wb-status">Saved</span></p>
+
+<div id="wb-app"
+     data-save-url="{% url 'whiteboard:save' board.pk %}"
+     data-export-url="{% url 'whiteboard:export_pdf' board.pk %}"
+     data-logo="{% static 'core/brand/neos-lockup.png' %}">
+  <div class="wb-bar wb-top" role="toolbar" aria-label="Board options">
+    <input type="text" id="wb-title" maxlength="150" value="{{ board.title }}" aria-label="Board title">
+    <div class="wb-group">
+      <select id="wb-bg" aria-label="Page style">
+        <option value="blank">Blank</option><option value="lined">Lined</option><option value="grid">Grid</option>
+      </select>
+      <button type="button" id="wb-prev" aria-label="Previous page">&#9664; Prev</button>
+      <span id="wb-pageno" class="cell-sub" style="min-width:42px; text-align:center;">1 / 1</span>
+      <button type="button" id="wb-next" aria-label="Next page">Next &#9654;</button>
+      <button type="button" id="wb-addpage">+ Page</button>
+      <button type="button" id="wb-delpage">Delete page</button>
+      <button type="button" id="wb-full" title="Hide the side menu so the paper fills the screen (Esc to leave)">Full screen</button>
+      <button type="button" id="wb-finger" aria-pressed="false" title="On: only the Pencil writes and a finger scrolls the page. Off: a finger writes too.">Finger scrolls</button>
+    </div>
+    <div class="wb-group">
+      <button type="button" id="wb-png" class="btn-primary">Export page (PNG)</button>
+      <button type="button" id="wb-pdf" class="btn-primary">Export A4 PDF</button>
+    </div>
+  </div>
+  <div class="wb-body">
+    <div id="wb-pages"></div>
+    <div class="wb-palette" role="toolbar" aria-label="Drawing tools">
+    <div class="wb-group" id="wb-tools">
+      <button type="button" data-tool="pen" class="on" title="Pen">&#9998; Pen</button>
+      <button type="button" data-tool="hl" title="Highlighter">&#128396; Marker</button>
+      <button type="button" data-tool="eraser" title="Eraser (removes whole strokes, shapes or text)">&#9003; Erase</button>
+      <button type="button" data-tool="text" title="Type text">T Text</button>
+      <button type="button" data-tool="line" title="Line">&#9585; Line</button>
+      <button type="button" data-tool="arrow" title="Arrow">&#8594; Arrow</button>
+      <button type="button" data-tool="rect" title="Rectangle">&#9645; Box</button>
+      <button type="button" data-tool="ellipse" title="Circle / ellipse">&#9711; Circle</button>
+    </div>
+    <div class="wb-group" id="wb-colors">
+      <button type="button" data-color="#1B1830" class="on" style="background:#1B1830" aria-label="Black"></button>
+      <button type="button" data-color="#43358A" style="background:#43358A" aria-label="Indigo"></button>
+      <button type="button" data-color="#00A3E4" style="background:#00A3E4" aria-label="Cyan"></button>
+      <button type="button" data-color="#C62828" style="background:#C62828" aria-label="Red"></button>
+      <button type="button" data-color="#2E7D32" style="background:#2E7D32" aria-label="Green"></button>
+      <button type="button" data-color="#F5E100" style="background:#F5E100" aria-label="Yellow"></button>
+      <input type="color" id="wb-custom" value="#1B1830" aria-label="Other colour">
+    </div>
+    <div class="wb-group" id="wb-widths">
+      <button type="button" data-width="2" class="on" title="Thin">&#8212;</button>
+      <button type="button" data-width="5" title="Medium"><b>&#8212;</b></button>
+      <button type="button" data-width="10" title="Thick"><b style="font-size:20px">&#8212;</b></button>
+    </div>
+    <div class="wb-group">
+      <button type="button" id="wb-undo" title="Undo">&#8630; Undo</button>
+      <button type="button" id="wb-redo" title="Redo">&#8631; Redo</button>
+    </div>
+    </div>
+  </div>
+</div>
+
+{{ board.data|json_script:"wb-data" }}
+<script src="{% static 'whiteboard/whiteboard.js' %}?v={{ asset_version }}"></script>
+{% endblock %}

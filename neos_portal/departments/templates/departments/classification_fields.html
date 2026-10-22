@@ -1,0 +1,37 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub">
+  <a href="{% url 'departments:list' %}">Departments</a> /
+  <a href="{% url 'departments:detail' classification.department.pk %}">{{ classification.department.name }}</a> /
+  <a href="{% url 'departments:classification_detail' classification.pk %}">{{ classification.name }}</a> /
+  Configure fields
+</p>
+
+<h1>Configure fields — {{ classification.name }}</h1>
+<a class="btn" href="{% url 'departments:classification_detail' classification.pk %}">Back to assets</a>
+
+<h2>Field definitions</h2>
+<table class="data-table">
+  <tr><th>Label</th><th>Type</th><th>Options</th><th></th></tr>
+  {% for f in field_defs %}
+  <tr>
+    <td>{{ f.label }}</td>
+    <td>{{ f.get_field_type_display }}</td>
+    <td>{{ f.dropdown_options|default:"—" }}</td>
+    <td>
+      {% if user.profile.can_delete %}<a data-post class="btn" href="{% url 'departments:field_delete' f.pk %}" data-confirm="Delete this field? Existing values for it will be lost.">Delete</a>{% endif %}
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="4">No fields yet.</td></tr>
+  {% endfor %}
+</table>
+
+<h3>New field</h3>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <p class="page-sub">For Dropdown or Searchable fields, list options comma-separated. For Value with unit, list the unit choices instead (e.g. "psi, bbl, ft").</p>
+  <button class="btn btn-primary" type="submit">Add field</button>
+</form>
+{% endblock %}

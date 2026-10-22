@@ -1,0 +1,41 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ABC Operations Portal</title>
+  <meta name="theme-color" content="#43358A">
+  <link rel="icon" type="image/png" sizes="32x32" href="{% static 'core/brand/favicon-32.png' %}">
+  <link rel="icon" type="image/png" sizes="192x192" href="{% static 'core/brand/favicon-192.png' %}">
+  <link rel="apple-touch-icon" href="{% static 'core/brand/apple-touch-icon.png' %}">
+  <link rel="stylesheet" href="{% static 'core/css/portal.css' %}?v={{ asset_version }}">
+  <script src="{% static 'core/js/theme.js' %}?v={{ asset_version }}"></script>
+</head>
+<body>
+  <div class="signature-band" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <div class="auth-shell">
+    <section class="auth-hero">
+      <a class="white-tab" href="/" aria-label="ABC Company">
+        <img src="{% static 'core/brand/neos-lockup.png' %}" alt="ABC Company" width="260" height="51">
+      </a>
+      <div class="hero-copy">
+        <p class="hero-kicker">ABC Operations Portal</p>
+        <h2>Energy in continuous motion.</h2>
+        <p>Equipment and personnel certificates, jobs, SGS reports and approvals, in one place.</p>
+      </div>
+      <img class="hero-cycle" src="{% static 'core/brand/neos-symbol.png' %}" alt="" width="560" height="557">
+    </section>
+    <section class="auth-main">
+      <div class="auth-theme">{% include "core/_theme_switch.html" %}</div>
+      <div class="auth-body-inner">
+        {% for message in messages %}
+          <div class="alert {% if message.level_tag == 'error' or message.level_tag == 'warning' %}alert-error{% else %}alert-success{% endif %}" style="width:min(400px, 100%); margin:0 0 12px;">{{ message }}</div>
+        {% endfor %}
+        {% block content %}{% endblock %}
+      </div>
+      <p class="auth-credit"><span class="spark"></span><span>Designed and built by <b>Rami Jasim</b></span></p>
+    </section>
+  </div>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>{% if item %}Edit observation{% else %}Add an observation{% endif %}</h1>
+<p class="page-sub">{{ visit.reference }} &middot; {{ visit.site }}</p>
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Save</button>
+  <a class="btn" href="{% url 'qhse:visit_detail' visit.pk %}">Cancel</a>
+</form>
+{% endblock %}

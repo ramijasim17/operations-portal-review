@@ -1,0 +1,12 @@
+{% load dept %}
+<div style="display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap; margin-bottom:14px;">
+  <div class="tabs-row" style="margin-bottom:0;">
+    <a href="{% url 'qhse:dashboard' %}" class="tab-box {% if section == 'followup' %}active{% endif %}">Follow-up</a>
+    <a href="{% url 'qhse:investigation_list' %}" class="tab-box {% if section == 'investigations' %}active{% endif %}">Investigations</a>
+    <a href="{% url 'qhse:inspection_list' %}" class="tab-box {% if section == 'inspections' %}active{% endif %}">Audits &amp; inspections</a>
+    <a href="{% url 'qhse:template_list' %}" class="tab-box {% if section == 'templates' %}active{% endif %}">Templates</a>
+    <a href="{% url 'qhse:visit_list' %}" class="tab-box {% if section == 'visits' %}active{% endif %}">Site visits</a>
+    <a href="{% url 'qhse:incident_list' %}" class="tab-box {% if section == 'incidents' %}active{% endif %}">Incidents</a>
+  </div>
+  {% dept_scope %}
+</div>

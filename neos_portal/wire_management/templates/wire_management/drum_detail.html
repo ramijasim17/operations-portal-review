@@ -1,0 +1,89 @@
+{% extends "core/base.html" %}
+{% load units %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'wire_management:list' %}">Wire Management</a> / {{ drum.drum_number }}</p>
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+  <h1>{{ drum.drum_number }} ({{ drum.wire_number }})</h1>
+  <div style="display:flex; gap:8px;">
+    {% if user.profile.can_download %}<a class="btn" href="{% url 'wire_management:drum_evidence_pdf' drum.pk %}">Download all evidence (combined PDF)</a>{% endif %}
+    {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'wire_management:drum_import_excel' drum.pk %}">Import from Excel</a>{% endif %}
+    {% if user.profile.can_edit %}<button type="button" class="btn btn-primary" onclick="document.getElementById('new-entry-modal').showModal()">+ Add job entry</button>{% endif %}
+  </div>
+</div>
+
+
+<div class="nc-card" style="max-width:600px; margin-bottom:20px;">
+  <p style="margin:4px 0;"><strong>Doc Code:</strong> {{ drum.doc_code|default:"—" }}</p>
+  <p style="margin:4px 0;"><strong>Diameter:</strong> {{ drum.diameter }}</p>
+  <p style="margin:4px 0;"><strong>Manufacturer:</strong> {{ drum.manufacturer|default:"—" }}</p>
+  <p style="margin:4px 0;"><strong>Asset Serial #:</strong> {{ drum.asset_serial_number|default:"—" }}</p>
+  <p style="margin:4px 0;"><strong>Grade:</strong> {{ drum.grade|default:"—" }}</p>
+  <p style="margin:4px 0;"><strong>Purchase Date:</strong> {{ drum.purchase_date|default:"—" }}</p>
+  <p style="margin:4px 0;"><strong>Total length:</strong> {{ drum.total_length_ft|ft_m }}</p>
+  <p style="margin:4px 0;"><strong>Remaining:</strong> {{ drum.remaining_length_ft|ft_m }}
+    <span class="pill {% if drum.percent_remaining <= 10 %}expired{% elif drum.percent_remaining <= 25 %}soon{% else %}valid{% endif %}">{{ drum.percent_remaining }}%</span>
+  </p>
+</div>
+
+<h2>Wire Log</h2>
+<div class="table-wrap">
+<table class="data-table">
+  <tr>
+    <th>Date</th><th>Client</th><th>Field/Well</th><th>Sour Env.</th><th>Wire Test Type</th>
+    <th>Wire Test Results</th><th>Max Depth</th><th>Max Tension</th><th>Jarring Depth</th>
+    <th>Jarring Tension</th><th>Jarring Duration</th><th>Run #</th><th>Cut Length (ft / m)</th>
+    <th>Remaining (ft / m)</th><th>Remarks</th><th>Supervisor</th><th>Evidence</th><th></th>
+  </tr>
+  {% for e in log_entries %}
+  <tr>
+    <td>{{ e.date }}</td>
+    <td>{{ e.client.name|default:"—" }}</td>
+    <td>{{ e.field_well.name|default:"—" }}</td>
+    <td>{{ e.sour_environment|default:"—" }}</td>
+    <td>{{ e.wire_test_type|default:"—" }}</td>
+    <td>{{ e.wire_test_results|default:"—" }}</td>
+    <td>{{ e.max_depth|default:"—" }}</td>
+    <td>{{ e.max_tension|default:"—" }}</td>
+    <td>{{ e.jarring_event_depth|default:"—" }}</td>
+    <td>{{ e.jarring_event_tension|default:"—" }}</td>
+    <td>{{ e.jarring_event_duration|default:"—" }}</td>
+    <td>{{ e.run_number|default:"—" }}</td>
+    <td>{{ e.cut_length_ft|ft_m }}</td>
+    <td>{{ e.remaining_length_ft|ft_m }}</td>
+    <td>{{ e.remarks|default:"—" }}</td>
+    <td>{{ e.supervisor.name|default:"—" }}</td>
+    <td>
+      {% if e.evidence_files.count %}
+        {% if user.profile.can_download %}<a href="{% url 'wire_management:entry_evidence_pdf' e.pk %}">{{ e.evidence_files.count }} file{{ e.evidence_files.count|pluralize }}</a>{% else %}{{ e.evidence_files.count }} file{{ e.evidence_files.count|pluralize }}{% endif %}
+      {% else %}—{% endif %}
+    </td>
+    <td>
+      {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'wire_management:entry_edit' e.pk %}">Edit</a>{% endif %}
+      {% if user.profile.can_delete %}<a data-post class="btn" href="{% url 'wire_management:entry_delete' e.pk %}" data-confirm="Delete this log entry?">Delete</a>{% endif %}
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="18">No jobs logged yet.</td></tr>
+  {% endfor %}
+</table>
+</div>
+
+{% if user.profile.can_edit %}
+<dialog id="new-entry-modal" style="border:none; border-radius:12px; padding:0; width:min(92vw, 640px);">
+  <form method="post" enctype="multipart/form-data" style="padding:24px; max-height:80vh; overflow-y:auto;">
+    {% csrf_token %}
+    <h2 style="margin-top:0;">Add job entry</h2>
+    {{ form.as_p }}
+    <label class="page-sub" style="display:block; margin-top:10px;">Evidence files (optional, multiple allowed)</label>
+    <input type="file" name="files" multiple>
+    <div style="margin-top:16px; display:flex; gap:8px;">
+      <button class="btn btn-primary" type="submit">Add log entry</button>
+      <button class="btn" type="button" onclick="document.getElementById('new-entry-modal').close()">Cancel</button>
+    </div>
+  </form>
+</dialog>
+{% if form.errors %}
+<script>document.addEventListener("DOMContentLoaded", function() { document.getElementById('new-entry-modal').showModal(); });</script>
+{% endif %}
+{% endif %}
+{% endblock %}

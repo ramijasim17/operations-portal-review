@@ -1,0 +1,60 @@
+{% extends "core/base.html" %}
+{% load approval_tags %}
+{% block title %}{{ visit.reference }} · Site visit{% endblock %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'qhse:visit_list' %}">Site visits</a> / {{ visit.reference }}</p>
+<div class="page-head">
+  <div>
+    <h1>{{ visit.site }}</h1>
+    <p class="page-sub"><span class="pill {{ visit.state_pill }}">{{ visit.state }}</span> {% if visit.department %}<span class="pill">{{ visit.department.name }}</span>{% endif %}
+      &nbsp;{{ visit.date|date:"j M Y" }}{% if visit.client %} &middot; {{ visit.client }}{% endif %}{% if visit.visited_by %} &middot; {{ visit.visited_by }}{% endif %}
+      <br><span class="cell-sub">{{ visit.reference }}{% if visit.purpose %} &middot; {{ visit.purpose }}{% endif %}</span></p>
+  </div>
+  <div class="page-head-actions">
+    {% if user.profile.can_download %}<a class="btn" href="{% url 'qhse:visit_pdf' visit.pk %}">Download PDF</a>{% endif %}
+    {% if user.profile.can_edit and not visit.is_locked %}
+      <a data-modal class="btn" href="{% url 'qhse:visit_edit' visit.pk %}">Edit</a>
+      <form method="post" action="{% url 'qhse:visit_submit' visit.pk %}" data-confirm="Submit this report for approval? It is locked until a Level 3 decides.">{% csrf_token %}<button class="btn btn-primary" type="submit">Submit for approval</button></form>
+    {% endif %}
+    {% if user.profile.can_delete %}<form method="post" action="{% url 'qhse:visit_delete' visit.pk %}">{% csrf_token %}<button class="btn" type="submit" data-confirm="Delete this site visit report?">Delete</button></form>{% endif %}
+  </div>
+</div>
+{% approval_panel visit "site_visit" %}
+
+<div class="dash-row dash-row-2">
+  <div class="dash-card">
+    <h3>Summary</h3><p style="margin:0;">{{ visit.summary|default:"Not written yet."|linebreaksbr }}</p>
+    {% if visit.attendees %}<h4 style="margin:14px 0 4px;">Others present</h4><p style="margin:0;">{{ visit.attendees|linebreaksbr }}</p>{% endif %}
+  </div>
+  <div class="dash-card">
+    <h3>Next steps</h3><p style="margin:0;">{{ visit.next_steps|default:"None recorded."|linebreaksbr }}</p>
+  </div>
+</div>
+
+<div class="dash-card">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+    <h3 style="margin:0;">Observations and findings <span class="dash-count">{{ items|length }}</span>
+      {% if unactioned %}<span class="pill soon" style="margin-left:6px;">{{ unactioned }} finding{{ unactioned|pluralize }} without an action</span>{% endif %}</h3>
+    {% if user.profile.can_edit and not visit.is_locked %}<a data-modal class="btn btn-primary" href="{% url 'qhse:item_create' visit.pk %}">+ Add observation</a>{% endif %}
+  </div>
+  {% for it in items %}
+  <div style="display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-top:1px solid var(--border); margin-top:10px; flex-wrap:wrap;">
+    <div style="flex:1 1 320px;">
+      <div class="cell-title">{{ forloop.counter }}. {{ it.area|default:"General" }} <span class="pill {{ it.kind_pill }}">{{ it.get_kind_display }}{% if it.severity %} &middot; {{ it.severity }}{% endif %}</span></div>
+      <p style="margin:4px 0 0;">{{ it.text|linebreaksbr }}</p>
+      {% if it.action %}<div class="cell-sub" style="margin-top:4px;">Action: <a href="{% url 'action_tracker:detail' it.action.pk %}">{{ it.action.action_item|truncatechars:80 }}</a> ({{ it.action.status }})</div>{% endif %}
+      {% if it.file %}{% if user.profile.can_download %}<div style="margin-top:6px;"><a href="{{ it.file.url }}" target="_blank">View photo</a></div>{% else %}<div class="cell-sub">Photo restricted</div>{% endif %}{% endif %}
+    </div>
+    {% if user.profile.can_edit %}
+    <div style="display:flex; gap:6px; align-items:flex-start; flex-wrap:wrap;">
+      {% if it.kind == 'finding' and not it.action %}<a data-modal class="btn" href="{% url 'qhse:item_action' it.pk %}">Raise action</a>{% endif %}
+      {% if not visit.is_locked %}
+        <a data-modal class="btn" href="{% url 'qhse:item_edit' it.pk %}">Edit</a>
+        <form method="post" action="{% url 'qhse:item_remove' it.pk %}">{% csrf_token %}<button class="btn" type="submit" data-confirm="Remove this observation?">Remove</button></form>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% empty %}<p class="dash-empty" style="margin-top:10px;">Nothing added yet. Add what you saw: good practice, observations, and findings that need action.</p>{% endfor %}
+</div>
+{% endblock %}

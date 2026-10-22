@@ -1,0 +1,211 @@
+{% extends "core/base.html" %}
+{% load departments_extras %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'departments:list' %}">Departments</a> / {{ department.name }}</p>
+
+<div class="page-head">
+  <div>
+    <h1>{{ department.name }}</h1>
+    <p class="page-sub">{{ department.location|default:"no location" }}</p>
+  </div>
+  <div class="page-head-actions">
+    {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'departments:edit' department.pk %}">Edit department</a>{% endif %}
+  </div>
+</div>
+
+<div class="stat-strip">
+  <div class="stat"><div class="stat-value">{{ classifications|length }}</div><div class="stat-label">classifications</div></div>
+  <div class="stat"><div class="stat-value">{{ totals.assets }}</div><div class="stat-label">assets</div></div>
+  <div class="stat {% if totals.away %}stat-warn{% else %}stat-muted{% endif %}"><div class="stat-value">{{ totals.away }}</div><div class="stat-label">out on jobs</div></div>
+  <div class="stat {% if totals.expired %}stat-bad{% else %}stat-good{% endif %}"><div class="stat-value">{{ totals.expired }}</div><div class="stat-label">certificates expired</div></div>
+  <div class="stat {% if totals.soon %}stat-warn{% else %}stat-good{% endif %}"><div class="stat-value">{{ totals.soon }}</div><div class="stat-label">expiring in 30 days</div></div>
+</div>
+
+<div class="tabs-row">
+  <a href="?tab=assets" class="tab-box {% if tab == 'assets' %}active{% endif %}">Assets</a>
+  <a href="?tab=certificates" class="tab-box {% if tab == 'certificates' %}active{% endif %}">Certificates</a>
+</div>
+
+{% if tab == 'assets' %}
+
+  <div class="toolbar">
+    <span class="page-sub" style="margin:0;">Click a classification to see its assets.</span>
+    {% if user.profile.can_edit %}<button type="button" class="btn btn-primary spacer" onclick="document.getElementById('new-classification-modal').showModal()">+ New classification</button>{% endif %}
+  </div>
+
+  <div class="dept-grid">
+    {% for c in classifications %}
+    <div class="dept-card">
+      <div class="dept-card-head">
+        <div>
+          <h3><a href="{% url 'departments:classification_detail' c.pk %}">{{ c.name }}</a></h3>
+          <div class="cell-sub">{{ c.field_count }} field{{ c.field_count|pluralize }}{% if c.is_unit %} &middot; <span class="pill soon" style="font-size:10.5px; padding:1px 8px;">units</span>{% endif %}</div>
+        </div>
+        <div class="dept-big">{{ c.stats.assets }}</div>
+      </div>
+      <div class="dept-pills">
+        {% if c.stats.away %}<span class="pill soon">{{ c.stats.away }} out on jobs</span>{% endif %}
+        {% if c.stats.expired %}<span class="pill expired">{{ c.stats.expired }} expired</span>{% endif %}
+        {% if c.stats.soon %}<span class="pill soon">{{ c.stats.soon }} expiring soon</span>{% endif %}
+        {% if not c.stats.certs and not c.stats.away %}<span class="pill">no certificates recorded</span>{% elif not c.stats.expired and not c.stats.soon and not c.stats.away %}<span class="pill valid">all good</span>{% endif %}
+      </div>
+      <div class="dept-card-foot">
+        <a class="btn btn-small btn-primary" href="{% url 'departments:classification_detail' c.pk %}">Open assets</a>
+        {% if user.profile.can_edit %}<a data-modal class="btn btn-small" href="{% url 'departments:classification_edit' c.pk %}">Edit</a>{% endif %}
+        {% if user.profile.can_delete %}<a data-post class="btn btn-small btn-ghost" href="{% url 'departments:classification_delete' c.pk %}"
+           data-confirm="Delete the classification '{{ c.name }}' and its {{ c.stats.assets }} asset{{ c.stats.assets|pluralize }}? This cannot be undone.">Delete</a>{% endif %}
+      </div>
+    </div>
+    {% empty %}
+    <div class="dash-card"><div class="dash-empty">No classifications yet.</div></div>
+    {% endfor %}
+  </div>
+
+  <dialog id="new-classification-modal" style="border:none; border-radius:12px; padding:0; width:min(90vw, 420px);">
+    {% if user.profile.can_edit %}<form method="post" style="padding:20px;">
+      {% csrf_token %}
+      <h2 style="margin-top:0;">New classification</h2>
+
+      <div style="margin-bottom:12px;">
+        <label>{{ form.name.label }}</label><br>
+        {{ form.name }}
+        {% if form.name.errors %}<div class="alert alert-error">{{ form.name.errors }}</div>{% endif %}
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="display:flex; gap:8px; align-items:center; color:var(--text);">{{ form.is_unit }} {{ form.is_unit.label }}</label>
+        <p class="page-sub" style="margin:4px 0 0;">{{ form.is_unit.help_text }}</p>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label>{{ form.copy_fields_from.label }}</label><br>
+        {{ form.copy_fields_from }}
+        <p class="page-sub" style="margin:4px 0 0;">{{ form.copy_fields_from.help_text }}</p>
+      </div>
+
+      <button class="btn btn-primary" type="submit">Create</button>
+      <button class="btn" type="button" onclick="document.getElementById('new-classification-modal').close()">Cancel</button>
+    </form>{% endif %}
+  </dialog>
+
+  {% if form.non_field_errors %}<div class="alert alert-error">{{ form.non_field_errors }}</div>{% endif %}
+  {% if form.errors %}
+    <script>document.addEventListener("DOMContentLoaded", function() { document.getElementById('new-classification-modal').showModal(); });</script>
+  {% endif %}
+
+{% else %}
+
+  <div style="margin-bottom: 12px;">
+    {% include "departments/_bulk_cert_modal.html" %}
+  </div>
+
+  <div style="display:flex; gap:8px; margin-bottom:1.2rem; flex-wrap:wrap;">
+    {% for c in classifications %}
+    <a href="?tab=certificates&classification={{ c.id }}{% if cert_type_id %}&cert_type={{ cert_type_id }}{% endif %}"
+       class="tab-box {% if cert_classification_id == c.id|stringformat:'s' %}active{% endif %}">{{ c.name }}</a>
+    {% empty %}
+    <span class="page-sub">No classifications yet.</span>
+    {% endfor %}
+  </div>
+
+  <form method="get" style="display:flex; gap:12px; align-items:flex-end; margin-bottom: 1.5rem; flex-wrap:wrap;">
+    <input type="hidden" name="tab" value="certificates">
+    <input type="hidden" name="classification" value="{{ cert_classification_id }}">
+    {% for c in selected_cols %}<input type="hidden" name="cols" value="{{ c }}">{% endfor %}
+    <div>
+      <label class="page-sub" style="display:block;">Cert type</label>
+      <select name="cert_type" onchange="this.form.submit()">
+        <option value="">All cert types</option>
+        {% for ct in all_cert_types %}
+        <option value="{{ ct.id }}" {% if cert_type_id == ct.id|stringformat:"s" %}selected{% endif %}>{{ ct.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% for c in cert_classifications %}{% if c.fields.all %}
+    <button type="button" class="btn" onclick="document.getElementById('columns-modal').showModal()">Columns{% if selected_cols %} ({{ selected_cols|length }}){% endif %}</button>
+    {% endif %}{% endfor %}
+    {% if cert_type_id %}
+    <a class="btn" href="?tab=certificates&classification={{ cert_classification_id }}{{ cols_qs }}">Clear cert type filter</a>
+    {% endif %}
+  </form>
+
+  {% for c in cert_classifications %}
+  <dialog id="columns-modal" class="nc-dialog nc-confirm" style="width:min(92vw, 420px);">
+    <form method="get">
+      <h3>Choose columns</h3>
+      <p class="page-sub" style="margin:0 0 12px;">Extra {{ c.name }} details to show next to the certificates. Asset is always shown.</p>
+      <input type="hidden" name="tab" value="certificates">
+      <input type="hidden" name="classification" value="{{ c.id }}">
+      {% if cert_type_id %}<input type="hidden" name="cert_type" value="{{ cert_type_id }}">{% endif %}
+      <div style="max-height:260px; overflow-y:auto; margin-bottom:16px;">
+        {% for f in c.fields.all %}
+        <label style="display:flex; gap:10px; align-items:center; margin:6px 0; color:var(--text);">
+          <input type="checkbox" name="cols" value="{{ f.id }}" style="width:auto;" {% if f.id in selected_cols %}checked{% endif %}> {{ f.label }}
+        </label>
+        {% endfor %}
+      </div>
+      <div class="nc-dialog-actions">
+        <button type="button" class="btn" onclick="document.getElementById('columns-modal').close()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Apply</button>
+      </div>
+    </form>
+  </dialog>
+  <div class="nc-card" style="margin-bottom: 1.5rem;">
+    <h3 style="margin-top:0; margin-bottom:12px;">{{ c.name }}</h3>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
+      {% for req in c.cert_requirements.all %}
+        {% if not cert_type_id or cert_type_id == req.cert_type_id|stringformat:"s" %}
+        <span class="pill">{{ req.cert_type.name }}</span>
+        {% endif %}
+      {% empty %}
+        <span class="page-sub">No cert types assigned yet.</span>
+      {% endfor %}
+    </div>
+    {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'departments:classification_certtypes' c.pk %}">Manage cert types</a>{% endif %}
+
+    {% if c.cert_requirements.all %}
+    <div class="table-wrap" style="margin-top:16px;">
+    <table class="data-table">
+      <tr>
+        <th>Asset</th>
+        {% for f in c.fields.all %}{% if f.id in selected_cols %}<th>{{ f.label }}</th>{% endif %}{% endfor %}
+        {% for req in c.cert_requirements.all %}
+          {% if not cert_type_id or cert_type_id == req.cert_type_id|stringformat:"s" %}
+          <th>{{ req.cert_type.name }}</th>
+          {% endif %}
+        {% endfor %}
+      </tr>
+      {% for a in c.assets.all %}
+      <tr>
+        <td><a href="{% url 'departments:classification_detail' c.pk %}">{{ a.name }}</a>{% if a.description %}<div class="page-sub" style="margin:0; font-size:12px;">{{ a.description }}</div>{% endif %}</td>
+        {% for f in c.fields.all %}{% if f.id in selected_cols %}<td>{{ a.values_by_field_id|get_item:f.id|default:"—" }}</td>{% endif %}{% endfor %}
+        {% for req in c.cert_requirements.all %}
+          {% if not cert_type_id or cert_type_id == req.cert_type_id|stringformat:"s" %}
+          {% with cert=a|cert_for:req.cert_type_id %}
+          <td>
+            {% if cert %}
+              <span class="pill {{ cert.status|status_class }}">{{ cert.status }}</span>
+              {% if cert.expiry_date %}<span class="page-sub">{{ cert.expiry_date }}</span>{% endif %}
+              {% if cert.certificate_file and user.profile.can_download %}<a href="{{ cert.certificate_file.url }}" target="_blank" rel="noopener" title="Open the certificate file">file</a>{% endif %}
+              {% if user.profile.can_edit %}<a data-modal href="{% url 'departments:asset_cert_edit' cert.pk %}">edit</a>{% endif %}
+            {% else %}
+              {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'departments:asset_cert_create' a.pk %}">add</a>{% endif %}
+            {% endif %}
+          </td>
+          {% endwith %}
+          {% endif %}
+        {% endfor %}
+      </tr>
+      {% empty %}
+      <tr><td colspan="20">No assets in this classification yet.</td></tr>
+      {% endfor %}
+    </table>
+    </div>
+    {% endif %}
+  </div>
+  {% empty %}
+  <p class="page-sub">No classifications match this filter.</p>
+  {% endfor %}
+
+{% endif %}
+{% endblock %}

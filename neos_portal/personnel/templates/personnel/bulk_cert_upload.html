@@ -1,0 +1,43 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'personnel:list' %}">Personnel</a> / Bulk certificate upload</p>
+<h1>Bulk certificate upload</h1>
+
+
+{% if not results %}
+<p class="page-sub">
+  Filenames should look like <code>employee-id_Name_ddmmyyyy</code> (or <code>employee-id_Name_EXP yyyymmdd</code>) &mdash; only the
+  FIRST part (employee ID) and LAST part (date) are read; the name in the
+  middle is ignored. Pick a course below, it applies to every file in this batch.
+  You'll see a preview of what matched before anything is saved.
+</p>
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <label>Course</label><br>
+  <select name="course" required style="width:100%; margin-bottom:12px;">
+    <option value="">Select...</option>
+    {% for c in courses %}
+    <option value="{{ c.id }}">{{ c.course_name }}</option>
+    {% endfor %}
+  </select>
+
+  <label>Files</label><br>
+  <input type="file" name="files" multiple required style="width:100%; margin-bottom:16px;">
+
+  <button class="btn btn-primary" type="submit">Preview</button>
+</form>
+{% else %}
+<h2>Results</h2>
+<table class="data-table">
+  <tr><th>File</th><th>Result</th><th>Detail</th></tr>
+  {% for r in results %}
+  <tr>
+    <td>{{ r.file }}</td>
+    <td><span class="pill {% if r.ok %}valid{% else %}expired{% endif %}">{% if r.ok %}OK{% else %}Skipped{% endif %}</span></td>
+    <td>{{ r.reason }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<a class="btn" href="{% url 'personnel:bulk_cert_upload' %}" style="margin-top:12px; display:inline-block;">Upload more</a>
+{% endif %}
+{% endblock %}

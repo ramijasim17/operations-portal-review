@@ -1,0 +1,180 @@
+{% extends "core/base.html" %}
+{% load sqb_extras %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'sqb:job_list' %}">SQB</a> / NPT Tracker</p>
+
+<div class="page-head">
+  <div>
+    <h1>NPT Tracker</h1>
+    <p class="page-sub">Non-productive time by job, unit, client and cause &mdash; measured against each client's hours and your KPIs.</p>
+  </div>
+  <div class="page-head-actions">
+    <a class="btn" href="{% url 'sqb:npt_compare' %}?period={{ period.key }}{% if client %}&client={{ client }}{% endif %}">Compare units</a>
+    {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'sqb:client_npt_manage' %}">Client setup</a>{% endif %}
+    {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'sqb:kpi_manage' %}">Manage KPIs</a>{% endif %}
+    {% if user.profile.can_edit %}<div data-popup-form="new-entry" data-popup-title="Log NPT" data-popup-button="+ Log NPT"><form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button class="btn btn-primary" type="submit">Save entry</button>
+    </form></div>{% endif %}
+  </div>
+</div>
+
+<form method="get" class="npt-filters" id="npt-filters">
+  {% include "sqb/_npt_filters.html" %}
+  <div class="npt-filter">
+    <label>Client</label>
+    <select name="client">
+      <option value="">All clients</option>
+      {% for c in filter_clients %}<option value="{{ c }}" {% if client == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="npt-filter">
+    <label>Unit</label>
+    <select name="unit">
+      <option value="">All units</option>
+      {% for u in filter_units %}<option value="{{ u.pk }}" {% if unit_id == u.pk|stringformat:"s" %}selected{% endif %}>{{ u.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="npt-filter">
+    <label>Cause</label>
+    <select name="category">
+      <option value="">All causes</option>
+      {% for value, label in category_choices %}<option value="{{ value }}" {% if category == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="npt-filter">
+    <label>Show</label>
+    <select name="show">
+      <option value="percent" {% if metric == 'percent' %}selected{% endif %}>NPT % of available hours</option>
+      <option value="hours" {% if metric == 'hours' %}selected{% endif %}>NPT hours</option>
+    </select>
+  </div>
+  <div class="npt-filter npt-filter-buttons">
+    <button class="btn btn-primary" type="submit">Apply</button>
+    {% if filters_active or period.key != 'last_3_months' %}<a class="btn" href="{% url 'sqb:tracker_list' %}">Reset</a>{% endif %}
+  </div>
+</form>
+
+<p class="page-sub" style="margin:4px 0 14px;">
+  Showing <strong>{{ period.label }}</strong>{% if filters_active %} &middot; filtered{% endif %}.
+  {% if selected_setting %}<strong>{{ client }}</strong> is worked out on <strong>{{ selected_setting.basis_text }}</strong>{% if selected_setting.basis != 'callout' %} &middot; {{ selected_setting.units.count }} unit{{ selected_setting.units.count|pluralize }}{% endif %}.
+  {% elif client and metric == 'percent' %}<span style="color:var(--warning);">{{ client }} has no NPT setup yet, so no % can be worked out{% if user.profile.can_edit %} &mdash; use <b>Client setup</b>{% endif %}.</span>{% endif %}
+</p>
+
+<div class="stat-strip">
+  <div class="stat"><div class="stat-value">{{ total|floatformat:"-1" }}<small style="font-size:14px; font-weight:600;"> h</small></div><div class="stat-label">total NPT</div></div>
+  <div class="stat {% if overall_percent is None %}stat-muted{% elif chart_kpi and chart_kpi.metric == 'percent' and overall_percent > chart_kpi.target %}stat-bad{% else %}stat-good{% endif %}">
+    <div class="stat-value">{% if overall_percent is None %}&mdash;{% else %}{{ overall_percent|floatformat:"-1" }}<small style="font-size:14px; font-weight:600;">%</small>{% endif %}</div>
+    <div class="stat-label">NPT of available{% if available %} &middot; {{ available|floatformat:"-1" }} h{% endif %}</div>
+  </div>
+  <div class="stat stat-muted"><div class="stat-value">{{ entry_count }}</div><div class="stat-label">entries</div></div>
+  <div class="stat {% if top_cause %}stat-warn{% else %}stat-muted{% endif %}"><div class="stat-value" style="font-size:18px; padding-top:6px;">{% if top_cause %}{{ top_cause.label }}{% else %}—{% endif %}</div><div class="stat-label">biggest cause{% if top_cause %} · {{ top_cause.hours|floatformat:"-1" }} h ({{ top_cause.share }}%){% endif %}</div></div>
+  {% if kpis_known %}<div class="stat {% if kpis_within == kpis_known %}stat-good{% else %}stat-bad{% endif %}"><div class="stat-value">{{ kpis_within }}/{{ kpis_known }}</div><div class="stat-label">KPIs within target</div></div>{% endif %}
+</div>
+
+{# ── chart ── #}
+<div class="dash-card" style="margin-bottom:14px;">
+  <h3>NPT over time <span class="dash-sub" style="display:inline; margin-left:6px;">{% if metric == 'percent' %}% of available hours{% else %}hours{% endif %} per {{ series.grouping }}{% if client %} &middot; {{ client }}{% endif %}</span></h3>
+  {% include "sqb/_npt_chart.html" %}
+  {% if not entry_count %}<div class="dash-empty" style="text-align:center;">No NPT logged in this period.</div>{% endif %}
+</div>
+
+{# ── KPI scorecard ── #}
+<div class="dash-card" style="margin-bottom:14px;">
+  <h3>KPIs <span class="dash-sub" style="display:inline; margin-left:6px;">judged on {{ scorecard.0.focus|date:"F Y"|default:"the latest month" }}{% if period.key == 'custom' %} &middot; counting only the days you picked{% endif %}</span></h3>
+  {% if scorecard %}
+  <div class="kpi-rows">
+    {% for row in scorecard %}
+    <div class="kpi-row">
+      <div class="kpi-row-name"><b>{{ row.kpi.name }}</b><div class="cell-sub">{{ row.kpi.scope_text }} &middot; max {{ row.kpi.target_text }}</div></div>
+      <div class="kpi-row-bar">
+        {% if row.status == 'unknown' %}
+        <div class="cell-sub" style="color:var(--warning);">Can't work out a % yet &mdash; {% if row.kpi.client %}{{ row.kpi.client }} has{% else %}no client has{% endif %} no NPT setup (or no available hours) in this period.</div>
+        {% else %}
+        <div class="progress"><div class="progress-track"><div class="progress-fill kpi-{{ row.status }}" style="width:{{ row.bar }}%;"></div></div>
+          <span class="progress-text"><b>{{ row.actual|floatformat:"-2" }}{% if row.metric == 'percent' %}%{% endif %}</b> / {{ row.target|floatformat:"-2" }}{% if row.metric == 'percent' %}%{% else %} h{% endif %}</span></div>
+        <div class="cell-sub">{% if row.metric == 'percent' %}{{ row.npt_hours|floatformat:"-1" }} h of {{ row.available|floatformat:"-1" }} h available{% if row.months_total > 1 %} &middot; {% endif %}{% endif %}{% if row.months_total > 1 %}over target in {{ row.months_over }} of {{ row.months_total }} months{% endif %}</div>
+        {% endif %}
+      </div>
+      <div><span class="pill {% if row.status == 'over' %}expired{% elif row.status == 'near' %}soon{% elif row.status == 'unknown' %}{% else %}valid{% endif %}">{% if row.status == 'over' %}Above KPI{% elif row.status == 'near' %}{{ row.percent }}% used{% elif row.status == 'unknown' %}No setup{% else %}Below KPI{% endif %}</span></div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="dash-empty">No KPIs set yet.{% if user.profile.can_edit %} Use <b>Manage KPIs</b> to set a target &mdash; as a % of available hours or as hours &mdash; for everything, or for one client, unit or cause.{% endif %}</div>
+  {% endif %}
+</div>
+
+<div class="dash-row dash-row-2">
+  <div class="dash-card">
+    <h3>By client <span class="dash-sub" style="display:inline; margin-left:6px;">each on its own basis</span></h3>
+    <table class="data-table" style="margin:0;">
+      <tr><th>Client</th><th>Basis</th><th>NPT</th><th>% of available</th></tr>
+      {% for c in clients %}
+      <tr>
+        <td class="cell-title"><span class="dot" style="background:{{ c.colour }};"></span>{% if c.name %}<a href="?period={{ period.key }}{% if period.key == 'month' %}&month={{ period.month_value }}{% elif period.key == 'custom' %}&from={{ period.from_value }}&to={{ period.to_value }}{% endif %}&client={{ c.name|urlencode }}">{{ c.name }}</a>{% endif %}</td>
+        <td><span class="cell-sub">{% if c.setting %}{{ c.basis }}{% else %}not set up{% endif %}</span></td>
+        <td><div class="progress"><div class="progress-track"><div class="progress-fill" style="width:{{ c.width }}%; background:{{ c.colour }};"></div></div><span class="progress-text"><b>{{ c.hours|floatformat:"-1" }}</b> h</span></div></td>
+        <td>{% if c.percent is not None %}<b>{{ c.percent|floatformat:"-1" }}%</b><div class="cell-sub">of {{ c.available|floatformat:"-1" }} h</div>{% else %}<span class="cell-sub">—</span>{% endif %}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" class="dash-empty" style="padding:16px;">No client has NPT in this period.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+  <div class="dash-card">
+    <h3>By cause</h3>
+    {% for c in causes %}
+    <div class="bar-row" style="grid-template-columns:120px 1fr 64px;"><span class="bar-label">{{ c.label }}</span><div class="bar-track"><div class="bar-fill cause-{{ c.key|default:'none' }}" style="width:{{ c.width }}%;"></div></div><span class="bar-count" style="width:auto;">{{ c.hours|floatformat:"-1" }} h</span></div>
+    {% empty %}<div class="dash-empty">Nothing to show.</div>{% endfor %}
+  </div>
+</div>
+
+<div class="dash-card" style="margin-bottom:14px;">
+  <h3>By unit <span class="dash-sub" style="display:inline; margin-left:6px;">every unit in Departments{% if client %} &middot; {{ client }} only{% endif %}</span></h3>
+  <table class="data-table" style="margin:0;">
+    <tr><th>Unit</th><th>Entries</th><th>NPT</th><th>% of available</th><th>Unit KPI</th></tr>
+    {% for u in units %}
+    <tr {% if u.selected %}style="background:var(--surface-2);"{% endif %}>
+      <td>
+        <div class="cell-title">{% if u.key %}<a href="?period={{ period.key }}{% if period.key == 'month' %}&month={{ period.month_value }}{% elif period.key == 'custom' %}&from={{ period.from_value }}&to={{ period.to_value }}{% endif %}{% if client %}&client={{ client|urlencode }}{% endif %}&unit={{ u.key }}">{{ u.label }}</a>{% else %}{{ u.label }}{% endif %}</div>
+        {% if u.sub %}<div class="cell-sub">{{ u.sub }}{% if multi_department and u.department %} &middot; {{ u.department }}{% endif %}</div>{% endif %}
+      </td>
+      <td>{{ u.count }}</td>
+      <td>{% if u.hours %}<div class="progress"><div class="progress-track"><div class="progress-fill" style="width:{{ u.width }}%;"></div></div><span class="progress-text"><b>{{ u.hours|floatformat:"-1" }}</b> h</span></div>{% else %}<span class="cell-sub">0 h</span>{% endif %}</td>
+      <td>{% if u.percent is not None %}<b>{{ u.percent|floatformat:"-1" }}%</b>{% else %}<span class="cell-sub">—</span>{% endif %}</td>
+      <td>{% if u.kpi and u.kpi.status != 'unknown' %}<span class="pill {% if u.kpi.status == 'over' %}expired{% elif u.kpi.status == 'near' %}soon{% else %}valid{% endif %}">{{ u.kpi.actual|floatformat:"-2" }}{% if u.kpi.metric == 'percent' %}%{% endif %} / {{ u.kpi.target|floatformat:"-2" }}{% if u.kpi.metric == 'percent' %}%{% else %} h{% endif %}</span>{% else %}<span class="cell-sub">no target</span>{% endif %}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5" class="dash-empty" style="padding:16px;">No units yet. In Departments, edit a classification and tick "These are units".</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+{# ── the entries ── #}
+<h3 style="margin:22px 0 10px;">Entries <span class="dash-count">{{ entries|length }}</span></h3>
+<div class="table-wrap">
+<table class="data-table">
+  <tr><th>Date</th><th>Job</th><th>Unit</th><th>Client</th><th>Cause</th><th>NPT</th><th>What happened</th><th></th></tr>
+  {% for e in entries %}
+  <tr>
+    <td style="white-space:nowrap;">{{ e.date|date:"d M Y" }}</td>
+    <td>{% if e.job_report %}<div class="cell-title"><a href="{% url 'job_reports:detail' e.job_report.pk %}">{{ e.job_report.name }}</a></div>{% if e.job_report.callout_days %}<div class="cell-sub">call-out · {{ e.job_report.callout_days }} day{{ e.job_report.callout_days|pluralize }}</div>{% endif %}{% elif e.job_ticket %}<span class="cell-sub">{{ e.job_ticket }} (not linked)</span>{% else %}<span class="cell-sub">no job</span>{% endif %}</td>
+    <td>{% if e.unit %}<div class="cell-title">{{ e.unit.name }}</div><div class="cell-sub">{{ e.unit.description }}</div>{% else %}<span class="cell-sub">not linked</span>{% endif %}</td>
+    <td>{% if e.client %}<span class="dot" style="background:{{ colours|get_key:e.client }};"></span>{{ e.client }}{% else %}—{% endif %}</td>
+    <td>{% if e.category %}<span class="cause-pill cause-{{ e.category }}">{{ e.get_category_display }}</span>{% else %}<span class="cell-sub">not classified</span>{% endif %}</td>
+    <td><b>{{ e.npt_hours|floatformat:"-1"|default:"—" }}</b> h</td>
+    <td>{{ e.description|default:"—"|truncatechars:60 }}</td>
+    <td class="actions-cell">
+      {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'sqb:tracker_edit' e.pk %}">Edit</a>{% endif %}
+      {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'qhse:investigation_create' %}?npt={{ e.pk }}" title="Look into why this time was lost">Investigate</a>{% endif %}
+      {% if user.profile.can_delete %}<form method="post" action="{% url 'sqb:tracker_delete' e.pk %}">{% csrf_token %}<button class="btn" type="submit" data-confirm="Delete this NPT entry?">Delete</button></form>{% endif %}
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="8" class="dash-empty" style="padding:24px;">No NPT entries match these filters in {{ period.label }}.</td></tr>
+  {% endfor %}
+</table>
+</div>
+{% endblock %}

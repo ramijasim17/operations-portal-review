@@ -1,0 +1,11 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>{% if assignment %}Edit supervisor{% else %}Add a supervisor{% endif %}</h1>
+<p class="page-sub">{{ report.name }} &mdash; for a job that runs several days, add each supervisor with the days they cover.</p>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Save</button>
+  <a class="btn" href="{% url 'job_reports:detail' report.pk %}">Cancel</a>
+</form>
+{% endblock %}

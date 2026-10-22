@@ -1,0 +1,31 @@
+<button type="button" class="btn" onclick="document.getElementById('bulk-cert-modal').showModal()">Bulk certificate upload</button>
+
+<dialog id="bulk-cert-modal" style="border:none; border-radius:12px; padding:0; width:min(90vw, 480px);">
+  {% if user.profile.can_edit %}<form method="post" action="{% url 'departments:bulk_cert_upload' %}" enctype="multipart/form-data" style="padding:20px;">
+    {% csrf_token %}
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="margin:0;">Bulk certificate upload</h2>
+      <button class="btn" type="button" onclick="document.getElementById('bulk-cert-modal').close()">Close</button>
+    </div>
+
+    <p class="page-sub">
+      Filenames like <code>ddmmyyyy_cert-type_provider_serial</code> or
+      <code>ddmmyyyy_description_serial</code> all work, and so does <code>EXP yyyymmdd_description_serial</code> &mdash; only the first
+      part (date) and last part (serial number) are read; everything else
+      is ignored. You'll see a preview of what matched before anything saves.
+    </p>
+
+    <label>Cert type</label><br>
+    <select name="cert_type" required style="width:100%; margin-bottom:12px;">
+      <option value="">Select...</option>
+      {% for ct in all_cert_types_global %}
+      <option value="{{ ct.id }}">{{ ct.name }}</option>
+      {% endfor %}
+    </select>
+
+    <label>Files</label><br>
+    <input type="file" name="files" multiple required style="width:100%; margin-bottom:16px;">
+
+    <button class="btn btn-primary" type="submit">Preview</button>
+  </form>{% endif %}
+</dialog>

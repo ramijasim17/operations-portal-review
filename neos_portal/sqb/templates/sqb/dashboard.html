@@ -1,0 +1,105 @@
+{% extends "core/base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>SQB</h1>
+    <p class="page-sub">Safety &amp; quality books &mdash; one per job, built from the parts its type requires.</p>
+  </div>
+  <div class="page-head-actions">
+    {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'sqb:type_manage' %}">Manage SQB types</a>{% endif %}
+    <a class="btn" href="{% url 'sqb:tracker_list' %}">NPT Tracker</a>
+  </div>
+</div>
+
+<div class="stat-strip">
+  <div class="stat {% if missing_jobs|length %}stat-warn{% else %}stat-good{% endif %}"><div class="stat-value">{{ missing_jobs|length }}</div><div class="stat-label">jobs missing an SQB</div></div>
+  <div class="stat"><div class="stat-value">{{ open_packages|length }}</div><div class="stat-label">open</div></div>
+  <div class="stat {% if ready_to_close %}stat-good{% else %}stat-muted{% endif %}"><div class="stat-value">{{ ready_to_close }}</div><div class="stat-label">ready to close</div></div>
+  <div class="stat stat-good"><div class="stat-value">{{ closed_packages|length }}</div><div class="stat-label">closed</div></div>
+</div>
+
+<div class="tabs-row">
+  <a href="?tab=missing" class="tab-box {% if tab == 'missing' %}active{% endif %}">Missing SQB <span class="tab-count">{{ missing_jobs|length }}</span></a>
+  <a href="?tab=open" class="tab-box {% if tab == 'open' %}active{% endif %}">Open <span class="tab-count">{{ open_packages|length }}</span></a>
+  <a href="?tab=closed" class="tab-box {% if tab == 'closed' %}active{% endif %}">Closed <span class="tab-count">{{ closed_packages|length }}</span></a>
+</div>
+
+{% if tab == 'missing' %}
+<div class="table-wrap">
+  <table class="data-table">
+    <tr><th>Job</th><th>Manifest</th><th>Client</th><th>Date</th><th></th></tr>
+    {% for job in missing_jobs %}
+    <tr>
+      <td>
+        <div class="cell-title"><a href="{% url 'job_reports:detail' job.pk %}">{{ job.name }}</a></div>
+        {% if job.linked_sgs_report %}<div class="cell-sub">{{ job.survey_report_type }} report in SGS</div>{% endif %}
+      </td>
+      <td>{{ job.manifest.job_name }}</td>
+      <td>{{ job.manifest.client|default:"—" }}</td>
+      <td>{{ job.manifest.date|date:"d M Y"|default:"—" }}</td>
+      <td class="actions-cell">{% if user.profile.can_edit %}<a data-modal class="btn btn-primary" href="{% url 'sqb:package_create' job.pk %}">Create SQB</a>{% endif %}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5" class="dash-empty" style="padding:24px;">Nothing missing &mdash; every job has an SQB. New jobs from Job Reports appear here automatically.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+{% elif tab == 'open' %}
+<div class="table-wrap">
+  <table class="data-table">
+    <tr><th>Job</th><th>SQB type</th><th>Parts uploaded</th><th>Created</th><th></th></tr>
+    {% for pkg in open_packages %}
+    <tr>
+      <td>
+        <div class="cell-title"><a href="{% url 'sqb:package_detail' pkg.pk %}">{{ pkg.job_report.name|default:pkg.job_name }}</a></div>
+        {% if pkg.job_report %}<div class="cell-sub">{{ pkg.job_report.manifest.job_name }}</div>{% endif %}
+      </td>
+      <td><span class="pill">{{ pkg.sqb_type.name }}</span></td>
+      <td>
+        <div class="progress">
+          <div class="progress-track"><div class="progress-fill {% if pkg.parts_total and pkg.parts_done == pkg.parts_total %}is-done{% endif %}" style="width:{{ pkg.percent }}%;"></div></div>
+          <span class="progress-text">{{ pkg.parts_done }} / {{ pkg.parts_total }}</span>
+        </div>
+      </td>
+      <td>{{ pkg.created_date|date:"d M Y" }}</td>
+      <td class="actions-cell">
+        <a class="btn" href="{% url 'sqb:package_detail' pkg.pk %}">Open</a>
+        {% if user.profile.can_delete %}<form method="post" action="{% url 'sqb:package_delete' pkg.pk %}">
+          {% csrf_token %}
+          <button class="btn" type="submit" data-confirm="Delete this SQB package?">Delete</button>
+        </form>{% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5" class="dash-empty" style="padding:24px;">No open SQB packages.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+{% elif tab == 'closed' %}
+<div class="table-wrap">
+  <table class="data-table">
+    <tr><th>Job</th><th>SQB type</th><th>Closed</th><th>Closed by</th><th></th></tr>
+    {% for pkg in closed_packages %}
+    <tr>
+      <td><div class="cell-title"><a href="{% url 'sqb:package_detail' pkg.pk %}">{{ pkg.job_name }}</a></div></td>
+      <td><span class="pill">{{ pkg.sqb_type.name }}</span></td>
+      <td>{{ pkg.closed_date|date:"d M Y" }}</td>
+      <td>{{ pkg.closed_by|default:"—" }}</td>
+      <td class="actions-cell">
+        {% if pkg.combined_file %}{% if user.profile.can_download %}<a class="btn btn-primary" href="{{ pkg.combined_file.url }}" target="_blank">Download PDF</a>{% else %}<span class="page-sub">Restricted</span>{% endif %}{% endif %}
+        <a class="btn" href="{% url 'sqb:package_detail' pkg.pk %}">View</a>
+        {% if user.profile.can_delete %}<form method="post" action="{% url 'sqb:package_delete' pkg.pk %}">
+          {% csrf_token %}
+          <button class="btn" type="submit" data-confirm="Delete this SQB package? Its combined PDF will be deleted too.">Delete</button>
+        </form>{% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5" class="dash-empty" style="padding:24px;">No closed SQB packages yet.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+{% endblock %}

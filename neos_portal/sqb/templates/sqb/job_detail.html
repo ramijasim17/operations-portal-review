@@ -1,0 +1,26 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'sqb:legacy_job_list' %}">SQB Jobs</a> / {{ job.job_number }}</p>
+<h1>{{ job.job_number }} — {{ job.job_name }}</h1>
+<p class="page-sub">Created {{ job.created_date|default:"—" }} · Permit {{ job.permit_number|default:"—" }}</p>
+
+<table class="data-table">
+  <tr><th>Document type</th><th>File</th><th>Uploaded</th><th></th></tr>
+  {% for d in documents %}
+  <tr>
+    <td>{{ d.doc_type }}</td>
+    <td>{% if d.file %}{% if user.profile.can_download %}<a href="{{ d.file.url }}" target="_blank">File</a>{% else %}<span class="page-sub">Restricted</span>{% endif %}{% else %}—{% endif %}</td>
+    <td>{{ d.uploaded_date }}</td>
+    <td>{% if user.profile.can_delete %}<a data-post class="btn" href="{% url 'sqb:document_delete' d.pk %}" data-confirm="Delete?">Delete</a>{% endif %}</td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="4">No documents yet.</td></tr>
+  {% endfor %}
+</table>
+
+{% if user.profile.can_edit %}<div data-popup-form="add-document" data-popup-title="Add document" data-popup-button="+ Add document"><form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Add</button>
+</form></div>{% endif %}
+{% endblock %}

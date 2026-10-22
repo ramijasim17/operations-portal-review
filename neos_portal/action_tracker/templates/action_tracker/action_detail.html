@@ -1,0 +1,83 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'action_tracker:list' %}?tab={% if action.is_open %}open{% else %}completed{% endif %}">Action Tracker</a> / {{ action.action_item|truncatechars:50 }}</p>
+
+<div class="page-head">
+  <div>
+    <h1>{{ action.action_item }}</h1>
+    <p class="page-sub">
+      <span class="pill {% if action.priority == 'High' %}expired{% elif action.priority == 'Medium' %}soon{% endif %}">{{ action.priority }} priority</span>
+      <span class="pill {% if action.status == 'In Progress' %}soon{% elif action.status == 'Completed' %}valid{% endif %}">{{ action.status }}</span>
+      {% if action.department %}<span class="pill">{{ action.department.name }}</span>{% endif %}{% if action.client %}<span class="pill">{{ action.client }}</span>{% endif %}{% if action.action_type %}<span class="pill">{{ action.get_action_type_display }}</span>{% endif %}
+      &nbsp;{% if action.assignee %}Assigned to <strong>{{ action.assignee }}</strong>{% else %}Unassigned{% endif %}
+      &middot;
+      {% if action.due_date %}
+        <span class="pill {{ action.due_state }}">due {{ action.due_date|date:"j M Y" }}{% if action.is_overdue %} &mdash; {{ action.days_left|cut:"-" }} day{{ action.days_left|cut:"-"|pluralize }} overdue{% endif %}</span>
+      {% else %}no due date{% endif %}
+      {% if action.raised_date %}<br><span class="cell-sub">raised {{ action.raised_date|date:"j M Y" }}{% if action.job_report %} &middot; job <a href="{% url 'job_reports:detail' action.job_report.pk %}">{{ action.job_report.name }}</a>{% endif %}{% if action.days_to_close is not None %} &middot; closed in <b>{{ action.days_to_close }}</b> day{{ action.days_to_close|pluralize }}{% elif action.age_days is not None %} &middot; open for {{ action.age_days }} day{{ action.age_days|pluralize }}{% endif %}</span>{% endif %}
+    </p>
+  </div>
+  <div class="page-head-actions">
+    {% if user.profile.can_edit %}
+      <a data-modal class="btn" href="{% url 'action_tracker:edit' action.pk %}">Edit</a>
+      <a data-modal class="btn" href="{% url 'qhse:investigation_create' %}?action={{ action.pk }}">Investigate</a>
+      <form method="post" action="{% url 'action_tracker:set_status' action.pk %}" data-noconfirm>
+        {% csrf_token %}<input type="hidden" name="next" value="{% url 'action_tracker:detail' action.pk %}">
+        <button class="btn btn-primary" type="submit">{% if action.is_open %}Mark done{% else %}Reopen{% endif %}</button>
+      </form>
+    {% endif %}
+    {% if user.profile.can_delete %}
+      <form method="post" action="{% url 'action_tracker:delete' action.pk %}">{% csrf_token %}<button class="btn" type="submit" data-confirm="Delete this action?">Delete</button></form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="dash-row dash-row-2">
+  <div class="dash-card">
+    <h3>Checklist {% if total %}<span class="dash-count">{{ done }}/{{ total }}</span>{% endif %}</h3>
+    {% if total %}<div class="progress" style="margin-bottom:12px;"><div class="progress-track"><div class="progress-fill {% if done == total %}is-done{% endif %}" style="width:{{ percent }}%;"></div></div><span class="progress-text">{{ percent }}%</span></div>{% endif %}
+    <ul class="check-list">
+      {% for step in steps %}
+      <li>
+        {% if user.profile.can_edit %}
+        <form method="post" data-noconfirm class="check-item">
+          {% csrf_token %}
+          <input type="hidden" name="toggle_step" value="{{ step.pk }}">
+          <label><input type="checkbox" data-autosubmit {% if step.is_completed %}checked{% endif %}> <span {% if step.is_completed %}class="is-done"{% endif %}>{{ step.step_description }}</span></label>
+          {% if step.completed_at %}<span class="cell-sub step-when" title="{% if step.completed_by %}Closed by {{ step.completed_by.username }}{% endif %}">closed {{ step.completed_at|date:"j M Y, H:i" }}</span>{% endif %}
+        </form>
+        <form method="post" data-noconfirm>
+          {% csrf_token %}<input type="hidden" name="delete_step" value="{{ step.pk }}">
+          <button type="submit" class="step-x" title="Remove this step">&times;</button>
+        </form>
+        {% else %}
+        <span class="check-item">{% if step.is_completed %}&#9745;{% else %}&#9744;{% endif %} {{ step.step_description }}{% if step.completed_at %} <span class="cell-sub">closed {{ step.completed_at|date:"j M Y, H:i" }}</span>{% endif %}</span>
+        {% endif %}
+      </li>
+      {% empty %}
+      <li class="dash-empty">No steps yet. Add the first one below.</li>
+      {% endfor %}
+    </ul>
+    {% if user.profile.can_edit %}
+    <form method="post" class="add-step" data-noconfirm>
+      {% csrf_token %}
+      <input type="text" name="step_description" placeholder="Add a step…" maxlength="255">
+      <button class="btn" type="submit" name="add_step" value="1">Add</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="dash-card">
+    <h3>Notes &amp; comments</h3>
+    {% if user.profile.can_edit %}
+    <form method="post" data-noconfirm>
+      {% csrf_token %}
+      <textarea name="comments" rows="7" style="min-height:140px;">{{ action.comments }}</textarea>
+      <div style="margin-top:10px;"><button class="btn btn-primary" type="submit" name="save_comments" value="1">Save notes</button></div>
+    </form>
+    {% else %}
+    <p class="page-sub" style="margin:0;">{{ action.comments|default:"No notes."|linebreaksbr }}</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

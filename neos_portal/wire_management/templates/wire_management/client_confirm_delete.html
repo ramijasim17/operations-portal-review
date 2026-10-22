@@ -1,0 +1,10 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Delete client "{{ client.name }}"?</h1>
+<p class="page-sub">If any wire log entries still reference this client, the delete will be blocked instead of leaving them without one.</p>
+<form method="post">
+  {% csrf_token %}
+  <button class="btn btn-primary" type="submit">Yes, delete it</button>
+  <a data-modal class="btn" href="{% url 'wire_management:client_manage' %}">Cancel</a>
+</form>
+{% endblock %}

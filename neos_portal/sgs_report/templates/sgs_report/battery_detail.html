@@ -1,0 +1,42 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'sgs_report:gauge_list' %}">Gauge Library</a> / Battery {{ battery.serial_number }}</p>
+<div class="page-head">
+  <div>
+    <h1>Battery {{ battery.serial_number }}</h1>
+    <p class="page-sub">Capacity {{ battery.capacity_mah|floatformat:0 }} mAh. Each job takes the hours the gauge was connected &times; the gauge's current draw.</p>
+  </div>
+  <div class="page-head-actions">{% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'sgs_report:battery_edit' battery.pk %}">Edit capacity / used before</a>{% endif %}</div>
+</div>
+
+<div class="stat-strip">
+  <div class="stat {% if low %}stat-bad{% else %}stat-good{% endif %}"><div class="stat-value">{{ remaining|floatformat:0 }}<span class="dash-sub"> mAh</span></div><div class="stat-label">left &middot; {{ percent|floatformat:0 }}%</div></div>
+  <div class="stat"><div class="stat-value">{{ used|floatformat:0 }}<span class="dash-sub"> mAh</span></div><div class="stat-label">used in total</div></div>
+  <div class="stat stat-muted"><div class="stat-value">{{ battery.total_hours|floatformat:1 }}<span class="dash-sub"> h</span></div><div class="stat-label">hours logged here</div></div>
+  {% if battery.used_before_mah %}<div class="stat stat-muted"><div class="stat-value">{{ battery.used_before_mah|floatformat:0 }}<span class="dash-sub"> mAh</span></div><div class="stat-label">used before it was added</div></div>{% endif %}
+</div>
+<div class="progress" style="margin:4px 0 18px;"><div class="progress-track"><div class="progress-fill {% if low %}is-over{% else %}is-done{% endif %}" style="width:{{ percent|floatformat:0 }}%;"></div></div><span class="progress-text">{{ percent|floatformat:0 }}% left</span></div>
+{% if low %}<div class="alert alert-error">This battery is low &mdash; change it before the next job.</div>{% endif %}
+
+<h2>Usage history</h2>
+<div class="table-wrap">
+<table class="data-table">
+  <tr><th>Well</th><th>Report Date</th><th>Report Type</th><th>Hours this job</th><th>Draw</th><th>Used this job</th><th>Left after</th><th>Hours so far</th><th></th></tr>
+  {% for usage in usages %}
+  <tr>
+    <td><a href="{% url 'sgs_report:detail' usage.report.pk %}">{{ usage.report.well_name }}</a></td>
+    <td>{{ usage.report.date_of_test|default:"—" }}</td>
+    <td>{{ usage.report.get_report_type_display }}</td>
+    <td>{{ usage.hours|floatformat:2 }}</td>
+    <td>{{ usage.draw_ma|floatformat:"-2" }} mA</td>
+    <td>{{ usage.consumed_mah|floatformat:1 }} mAh{% if usage.manual %} <span class="pill soon">amended</span>{% endif %}</td>
+    <td><b>{{ usage.left_after|floatformat:0 }}</b> mAh</td>
+    <td>{{ usage.running_total|floatformat:1 }}</td>
+    <td class="actions-cell">{% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'sgs_report:battery_usage_edit' usage.pk %}">Amend</a>{% endif %}</td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="9">No usage recorded yet for this battery.</td></tr>
+  {% endfor %}
+</table>
+</div>
+{% endblock %}

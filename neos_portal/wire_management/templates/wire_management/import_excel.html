@@ -1,0 +1,22 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'wire_management:detail' drum.pk %}">{{ drum.drum_number }}</a> / Import from Excel</p>
+<h1>Import log entries — {{ drum.drum_number }}</h1>
+<p class="page-sub">
+  Use the template below so columns line up correctly.
+  <a href="{% url 'wire_management:import_template' %}">Download blank template (.xlsx)</a>
+</p>
+
+
+<form method="post" enctype="multipart/form-data" style="max-width:480px;">
+  {% csrf_token %}
+  <input type="file" name="excel_file" accept=".xlsx" required>
+  <button class="btn btn-primary" type="submit" style="margin-top:12px;">Import</button>
+  <a class="btn" href="{% url 'wire_management:detail' drum.pk %}">Cancel</a>
+</form>
+
+<p class="page-sub" style="margin-top:16px;">
+  Client and Field/Well are created automatically if new. Supervisor must match an existing
+  active Personnel record by name, or it will be left blank with a note after import.
+</p>
+{% endblock %}

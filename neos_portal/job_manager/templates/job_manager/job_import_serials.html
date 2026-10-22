@@ -1,0 +1,37 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'job_manager:detail' job.pk %}">{{ job.job_name }}</a> / Import serials from Excel</p>
+<h1>Import equipment from Excel — {{ job.job_name }}</h1>
+<p class="page-sub">Upload a spreadsheet with one Asset No / Serial No per row (first column). Matches already in the database show in green and can be added; items already on another open manifest show in amber and are skipped; anything not found shows in red and is skipped.</p>
+
+<form method="post" enctype="multipart/form-data" style="display:flex; gap:8px; align-items:flex-end; margin-bottom:20px;">
+  {% csrf_token %}
+  <input type="file" name="excel_file" accept=".xlsx,.xls" required>
+  <button class="btn btn-primary" type="submit">Check serial numbers</button>
+</form>
+
+{% if rows is not None %}
+  {% if rows %}
+  <form method="post" action="{% url 'job_manager:detail' job.pk %}">
+    {% csrf_token %}
+    <table class="data-table">
+      <tr><th></th><th>Serial Number</th><th>Status</th><th>Description</th><th>Classification</th></tr>
+      {% for row in rows %}
+      <tr style="background:{% if row.found and not row.taken_by %}rgba(0,180,0,0.12){% elif row.taken_by %}rgba(255,184,77,0.14){% else %}rgba(200,0,0,0.12){% endif %};">
+        <td>
+          {% if row.found and not row.taken_by %}<input type="checkbox" name="add_serial" value="{{ row.serial }}" checked>{% endif %}
+        </td>
+        <td>{{ row.serial }}</td>
+        <td>{% if row.taken_by %}<span style="color:var(--warning);">Already on '{{ row.taken_by.job_name }}' — transfer it from there</span>{% elif row.found %}<span style="color:var(--success);">Found{% if row.away %} (currently {{ row.asset.current_location }}){% endif %}</span>{% else %}<span style="color:var(--danger);">Not found in database</span>{% endif %}</td>
+        <td>{{ row.asset.description|default:"—" }}</td>
+        <td>{{ row.asset.classification.name|default:"—" }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    <button class="btn btn-primary" type="submit" name="add_serials" value="1" style="margin-top:12px;">Add checked items to manifest</button>
+  </form>
+  {% else %}
+  <p class="page-sub">No new serial numbers found in that file (or everything in it is already on this manifest).</p>
+  {% endif %}
+{% endif %}
+{% endblock %}

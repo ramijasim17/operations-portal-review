@@ -1,0 +1,10 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>{% if heading %}{{ heading }}{% elif t %}Edit template{% else %}New audit template{% endif %}</h1>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Save</button>
+  <a class="btn" href="{% if t %}{% url 'qhse:template_detail' t.pk %}{% else %}{% url 'qhse:template_list' %}{% endif %}">Cancel</a>
+</form>
+{% endblock %}

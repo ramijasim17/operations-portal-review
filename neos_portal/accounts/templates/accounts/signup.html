@@ -1,0 +1,28 @@
+{% extends "core/base_unauthenticated.html" %}
+{% block content %}
+<div class="auth-card">
+  <h1>ABC Operations Portal</h1>
+  <p class="auth-sub">Create an account. You must be in the company personnel records — your Employee ID is checked, and your account is linked to your personnel record. New accounts start with View access; an admin can grant more from Access Control.</p>
+  {% if signup_hint %}<div class="alert alert-success" style="text-align:left;">{{ signup_hint }}</div>{% endif %}
+  {% if form.non_field_errors %}<div class="alert alert-error">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+  <form method="post">
+    {% csrf_token %}
+    <label for="id_employee_id">Employee ID</label>
+    {{ form.employee_id }}
+    {% if form.employee_id.errors %}<div class="alert alert-error">{{ form.employee_id.errors|join:" " }}</div>{% endif %}
+    <label for="id_username">Username <small>(you can also sign in with your Employee ID)</small></label>
+    {{ form.username }}
+    {% if form.username.errors %}<div class="alert alert-error">{{ form.username.errors|join:" " }}</div>{% endif %}
+    <label for="id_email">Email</label>
+    {{ form.email }}
+    {% if form.email.errors %}<div class="alert alert-error">{{ form.email.errors|join:" " }}</div>{% endif %}
+    <label for="id_password">Password</label>
+    {{ form.password }}
+    {% if form.password.errors %}<div class="alert alert-error">{{ form.password.errors|join:" " }}</div>{% endif %}
+    <label for="id_password_confirm">Confirm password</label>
+    {{ form.password_confirm }}
+    <button type="submit" class="btn btn-primary btn-block">Create account</button>
+  </form>
+  <a class="auth-link" href="{% url 'accounts:login' %}">Already have an account? Sign in</a>
+</div>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>NPT KPIs</h1>
+<p class="page-sub">A KPI is the most NPT you accept: either a <b>% of the hours available</b> (set a client's basis first under Client setup) or a number of <b>hours per month</b>. Leave the client, unit and cause empty to cover all NPT, or fill any of them to narrow it &mdash; for example "Client A &le; 3%" or "Personnel &le; 4 h".</p>
+<div class="table-wrap">
+<table class="data-table">
+  <tr><th>KPI</th><th>Covers</th><th>Target</th><th></th></tr>
+  {% for k in kpis %}
+  <tr {% if not k.is_active %}style="opacity:.55;"{% endif %}>
+    <td class="cell-title">{{ k.name }}{% if not k.is_active %} <span class="pill">not in use</span>{% endif %}</td>
+    <td>{{ k.scope_text|capfirst }}</td>
+    <td><b>{{ k.target_text }}</b></td>
+    <td class="actions-cell">
+      {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'sqb:kpi_edit' k.pk %}">Edit</a>{% endif %}
+      {% if user.profile.can_delete %}<form method="post" action="{% url 'sqb:kpi_delete' k.pk %}">{% csrf_token %}<button class="btn" type="submit" data-confirm="Delete this KPI?">Delete</button></form>{% endif %}
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="4" class="dash-empty" style="padding:18px;">No KPIs yet.</td></tr>
+  {% endfor %}
+</table>
+</div>
+<h2 style="margin-top:22px;">New KPI</h2>
+<form method="post" class="kpi-form">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Add KPI</button>
+  <a class="btn" href="{% url 'sqb:tracker_list' %}">Back</a>
+</form>
+<script>
+(function () {
+  var form = document.querySelector("#kpi-form, form.kpi-form");
+  if (!form) return;
+  var metric = form.querySelector("[name=metric]");
+  var label = form.querySelector("[name=target]").closest("p").querySelector("label");
+  var input = form.querySelector("[name=target]");
+  function update() {
+    var pct = metric.value === "percent";
+    label.textContent = pct ? "Target (the most allowed, % of available hours):" : "Target (the most allowed, hours per month):";
+    input.max = pct ? 100 : "";
+  }
+  metric.addEventListener("change", update);
+  update();
+})();
+</script>
+{% endblock %}

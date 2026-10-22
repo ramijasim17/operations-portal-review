@@ -1,0 +1,26 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'wire_management:list' %}">Wire Management</a> / Clients</p>
+<h1>Clients</h1>
+
+
+<div class="table-wrap" style="max-width:480px;">
+<table class="data-table">
+  <tr><th>Name</th><th></th></tr>
+  {% for c in clients %}
+  <tr><td>{{ c.name }}</td><td><a class="btn" href="{% url 'wire_management:client_delete' c.pk %}">Delete</a></td></tr>
+  {% empty %}
+  <tr><td colspan="2">No clients yet.</td></tr>
+  {% endfor %}
+</table>
+</div>
+
+<form method="post" style="margin-top:20px; max-width:420px; display:flex; gap:8px; align-items:flex-end;">
+  {% csrf_token %}
+  <div style="flex:1;">
+    <label class="page-sub" style="display:block;">{{ form.name.label }}</label>
+    {{ form.name }}
+  </div>
+  <button class="btn btn-primary" type="submit">Add client</button>
+</form>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Delete "{{ job.job_number }}"?</h1>
+<p class="page-sub">This deletes all documents attached to this job too.</p>
+<form method="post">
+  {% csrf_token %}
+  <button class="btn btn-primary" type="submit">Delete</button>
+  <a class="btn" href="{% url 'sqb:legacy_job_list' %}">Cancel</a>
+</form>
+{% endblock %}

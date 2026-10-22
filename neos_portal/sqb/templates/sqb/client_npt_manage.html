@@ -1,0 +1,21 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Client NPT setup</h1>
+<p class="page-sub">Each client is measured on its own basis. NPT % = NPT hours &divide; the hours available on that basis.</p>
+<div class="table-wrap">
+<table class="data-table">
+  <tr><th>Client</th><th>Worked out on</th><th>Units</th><th></th></tr>
+  {% for row in rows %}
+  <tr>
+    <td class="cell-title">{{ row.client.name }}</td>
+    <td>{% if row.setting %}{{ row.setting.basis_text }}{% else %}<span class="pill">not set up</span>{% endif %}</td>
+    <td>{% if row.setting %}{% if row.setting.basis == 'callout' %}<span class="cell-sub">by job</span>{% else %}{{ row.setting.units.count }}{% endif %}{% else %}—{% endif %}</td>
+    <td class="actions-cell">{% if user.profile.can_edit %}<a data-modal class="btn {% if not row.setting %}btn-primary{% endif %}" href="{% url 'sqb:client_npt_edit' row.client.pk %}">{% if row.setting %}Edit{% else %}Set up{% endif %}</a>{% endif %}</td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="4" class="dash-empty" style="padding:18px;">No clients yet. Add them under Clients &amp; Fields in the sidebar.</td></tr>
+  {% endfor %}
+</table>
+</div>
+<a class="btn" href="{% url 'sqb:tracker_list' %}" style="margin-top:14px; display:inline-block;">Back</a>
+{% endblock %}

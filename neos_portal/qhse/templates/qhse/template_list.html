@@ -1,0 +1,27 @@
+{% extends "core/base.html" %}
+{% block title %}Audit templates · QHSE{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Audit templates</h1><p class="page-sub">The checklists behind your audits and inspections: parts, and the points to check in each. Only Level 3 can build or change them.</p></div>
+  <div class="page-head-actions">{% if user.profile.can_approve %}<a data-modal class="btn btn-primary" href="{% url 'qhse:template_create' %}">+ New template</a>{% endif %}</div>
+</div>
+{% include "qhse/_tabs.html" %}
+<div class="table-wrap">
+<table class="data-table">
+  <thead><tr><th>Template</th><th>Department</th><th>Type</th><th>Parts</th><th>Points</th><th>Pass mark</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for t in templates %}
+  <tr {% if not t.is_active %}style="opacity:.6;"{% endif %}>
+    <td><div class="cell-title"><a href="{% url 'qhse:template_detail' t.pk %}">{{ t.name }}</a></div>{% if t.description %}<div class="cell-sub">{{ t.description|truncatechars:80 }}</div>{% endif %}</td>
+    <td>{% if t.department %}{{ t.department.name }}{% else %}<span class="cell-sub">All departments</span>{% endif %}</td>
+    <td>{{ t.get_kind_display }}</td>
+    <td>{{ t.parts.all|length }}</td>
+    <td>{{ t.point_count }}</td>
+    <td>{{ t.pass_mark }}%</td>
+    <td><span class="pill {% if t.is_active %}valid{% endif %}">{% if t.is_active %}In use{% else %}Retired{% endif %}</span></td>
+  </tr>
+  {% empty %}<tr><td colspan="7" class="dash-empty" style="padding:20px;">No templates yet.{% if user.profile.can_approve %} Create one, then add its parts and points.{% endif %}</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

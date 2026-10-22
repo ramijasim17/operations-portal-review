@@ -1,0 +1,944 @@
+{% extends "core/base.html" %}
+{% load static %}
+{% load sgs_extras approval_tags %}
+{% block content %}
+
+<p class="page-sub crumbs"><a href="{% url 'sgs_report:list' %}">SGS Final Reports</a> / {{ report.well_name }}</p>
+<div class="page-head">
+  <div>
+    <h1>{{ report.well_name }}{% if report.field %} <span style="font-weight:500; opacity:.8;">&mdash; {{ report.field }}</span>{% endif %}</h1>
+    <p class="page-sub">
+      <span class="pill">{{ report.get_report_type_display }}</span>
+      <span class="pill {% if report.status == 'Approved' %}valid{% elif report.status == 'Sent' %}soon{% else %}expired{% endif %}">{{ report.status }}</span>
+      &nbsp;{{ report.test_type }} &middot; {{ report.date_of_test|date:"j M Y"|default:"no date" }} &middot; {{ report.client|default:"no client" }}
+    </p>
+    {% for jr in report.job_reports.all %}
+    <p class="page-sub" style="margin-top:6px;">From job <a href="{% url 'job_reports:detail' jr.pk %}">{{ jr.name }}</a> &middot; manifest <a href="{% url 'job_manager:detail' jr.manifest.pk %}">{{ jr.manifest.job_name }}</a></p>
+    {% endfor %}
+  </div>
+  <div class="page-head-actions">
+    {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'sgs_report:edit' report.pk %}">Edit common information</a>{% endif %}
+    {% if user.profile.can_download %}
+      {% if result_released %}<a class="btn" href="{% url 'sgs_report:export_excel' report.pk %}">Excel</a>{% else %}<a class="btn is-locked" href="?tab=result" title="The result must be approved first">Excel &#128274;</a>{% endif %}
+      {% if final_released %}<a class="btn btn-primary" href="{% url 'sgs_report:generate_pdf' report.pk %}">PDF</a>{% else %}<a class="btn is-locked" href="?tab=final" title="The final report must be approved first">PDF &#128274;</a>{% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<div class="steps">
+  <a class="step {% if report.run_start and report.well_name %}is-done{% else %}is-todo{% endif %}" href="?tab=common">
+    <span class="step-dot">{% if report.run_start %}&#10003;{% else %}!{% endif %}</span>
+    <div class="step-title">1 &middot; Common information</div>
+    <div class="step-body">{% with run=report.run_window %}{% if run.0 %}Run {{ run.0|date:"d M Y" }}{% else %}Run not set{% endif %}{% endwith %}</div>
+    <div class="step-note">{{ report.bottom_gauge|default:"no bottom gauge" }}{% if report.top_gauge %} &middot; {{ report.top_gauge }}{% endif %}</div>
+  </a>
+  <a class="step {% if progress.logs == 2 %}is-done{% elif progress.logs %}is-todo{% else %}is-todo{% endif %}" href="?tab=gauge_logs">
+    <span class="step-dot">{% if progress.logs == 2 %}&#10003;{% else %}{{ progress.logs }}{% endif %}</span>
+    <div class="step-title">2 &middot; Gauge logs</div>
+    <div class="step-body">{{ progress.logs }} of 2 uploaded</div>
+    <div class="step-note">{% if battery_summary %}battery {{ battery_summary.0.consumed|floatformat:0 }} mAh used{% else %}no battery use yet{% endif %}</div>
+  </a>
+  <a class="step {% if progress.stations and progress.stations == progress.stations_done %}is-done{% else %}is-todo{% endif %}" href="?tab=result">
+    <span class="step-dot">{% if progress.stations and progress.stations == progress.stations_done %}&#10003;{% else %}3{% endif %}</span>
+    <div class="step-title">3 &middot; SGS result</div>
+    <div class="step-body">{{ progress.stations_done }} of {{ progress.stations }} stations complete</div>
+    <div class="step-note">pressure &amp; temperature per depth</div>
+  </a>
+  <a class="step {% if progress.events and progress.images %}is-done{% else %}is-todo{% endif %}" href="?tab=final">
+    <span class="step-dot">{% if progress.events and progress.images %}&#10003;{% else %}4{% endif %}</span>
+    <div class="step-title">4 &middot; Final report</div>
+    <div class="step-body">{{ progress.events }} event{{ progress.events|pluralize }} &middot; {{ progress.images }}/{{ progress.image_total }} images</div>
+    <div class="step-note">{% if report.generated_at %}generated {{ report.generated_at|date:"d M H:i" }}{% else %}not generated yet{% endif %}</div>
+  </a>
+</div>
+
+<div class="tabs-row">
+  <a href="?tab=common" class="tab-box {% if tab == 'common' %}active{% endif %}">Common Information</a>
+  <a href="?tab=gauge_logs" class="tab-box {% if tab == 'gauge_logs' %}active{% endif %}">Gauge Logs</a>
+  <a href="?tab=result" class="tab-box {% if tab == 'result' %}active{% endif %}">Build SGS Result</a>
+  <a href="?tab=final" class="tab-box {% if tab == 'final' %}active{% endif %}">Build Final Report</a>
+</div>
+
+{% if tab == 'common' %}
+
+  <div class="dash-row dash-row-2">
+    <div class="dash-card">
+      <h3>Test details</h3>
+      <dl class="def-grid">
+        <div><dt>Report type</dt><dd>{{ report.get_report_type_display }}</dd></div>
+        <div><dt>Test type</dt><dd>{{ report.test_type|default:"—" }}</dd></div>
+        <div><dt>Client</dt><dd>{{ report.client|default:"—" }}</dd></div>
+        <div><dt>Company</dt><dd>{{ report.company|default:"—" }}</dd></div>
+        <div><dt>Field</dt><dd>{{ report.field|default:"—" }}</dd></div>
+        <div><dt>Rig</dt><dd>{{ report.rig|default:"—" }}</dd></div>
+        <div><dt>SOR number</dt><dd>{{ report.sor_number|default:"—" }}</dd></div>
+        <div><dt>DGS / CPS</dt><dd>{{ report.dgs_cps|default:"—" }}</dd></div>
+        <div><dt>Country / city</dt><dd>{{ report.country_city|default:"—" }}</dd></div>
+        <div><dt>Depth reference</dt><dd>{{ report.depth_reference|default:"—" }}</dd></div>
+        <div><dt>Unit system</dt><dd>{{ report.unit_system|default:"—" }}</dd></div>
+        <div><dt>Temperature unit</dt><dd>{{ report.get_temp_unit_display }}</dd></div>
+        <div><dt>Time display</dt><dd>{{ report.get_time_display_display }}</dd></div>
+        <div><dt>Client logo</dt><dd>{% if report.client_logo %}<img src="{{ report.client_logo.url }}" style="max-width:120px; max-height:44px; display:block;">{% else %}<span class="cell-sub">not uploaded</span>{% endif %}</dd></div>
+      </dl>
+    </div>
+
+    <div class="dash-card">
+      <h3>Run &amp; gauges</h3>
+      <dl class="def-grid">
+        <div><dt>Run start</dt><dd>{{ report.run_start|date:"d M Y H:i:s"|default:"—" }}</dd></div>
+        <div><dt>Run end</dt><dd>{{ report.run_end|date:"d M Y H:i:s"|default:"—" }}</dd></div>
+        <div><dt>Run duration</dt><dd>{% if report.run_hours %}{{ report.run_hours }} h{% else %}—{% endif %}</dd></div>
+        <div><dt>WHP / psi</dt><dd>{{ report.whp_psi_value|default:"—" }} <span class="cell-sub" style="display:inline;">last station</span></dd></div>
+      </dl>
+      <table class="data-table table-compact" style="margin:16px 0 0;">
+        <tr><th>Gauge</th><th>Connected</th><th>Disconnected</th><th>Hours</th><th>Battery</th></tr>
+        <tr>
+          <td><b>Bottom</b><div class="cell-sub">{{ report.bottom_gauge|default:"not selected" }}</div></td>
+          <td>{{ report.bottom_gauge_connected_at|date:"d M H:i:s"|default:"—" }}</td>
+          <td>{{ report.bottom_gauge_disconnected_at|date:"d M H:i:s"|default:"—" }}</td>
+          <td>{{ report.bottom_gauge_hours|default:"—" }}</td>
+          <td>{{ report.bottom_gauge.battery|default:"—" }}</td>
+        </tr>
+        <tr>
+          <td><b>Top</b><div class="cell-sub">{{ report.top_gauge|default:"not selected" }}</div></td>
+          <td>{{ report.top_gauge_connected_at|date:"d M H:i:s"|default:"—" }}</td>
+          <td>{{ report.top_gauge_disconnected_at|date:"d M H:i:s"|default:"—" }}</td>
+          <td>{{ report.top_gauge_hours|default:"—" }}</td>
+          <td>{{ report.top_gauge.battery|default:"—" }}</td>
+        </tr>
+      </table>
+      <p class="cell-sub" style="margin:10px 0 0;">The gauge times come from the uploaded log files (Gauge Logs tab) and drive the battery hours. The run dates set the dates of events and stations.</p>
+    </div>
+  </div>
+
+  <div class="dash-row dash-row-2">
+    <div class="dash-card">
+      <h3>Well data</h3>
+      <dl class="def-grid">
+        <div><dt>Well state before test</dt><dd>{{ report.well_state_before_test|default:"—" }}</dd></div>
+        <div><dt>Well type</dt><dd>{{ report.well_type|default:"—" }}</dd></div>
+        <div><dt>Fluid type</dt><dd>{{ report.fluid_type|default:"—" }}</dd></div>
+        <div><dt>Completion</dt><dd>{{ report.completion_type|default:"—" }}</dd></div>
+        <div><dt>Well status</dt><dd>{{ report.well_status|default:"—" }}</dd></div>
+        <div><dt>Minimum restriction</dt><dd>{{ report.min_restriction|default:"—" }}</dd></div>
+        <div><dt>Casing size</dt><dd>{{ report.casing_size|default:"—" }}</dd></div>
+        <div><dt>Tubing size</dt><dd>{{ report.tubing_size|default:"—" }}</dd></div>
+        <div class="wide"><dt>Test interval</dt><dd>{{ report.test_interval|default:"—" }}</dd></div>
+      </dl>
+    </div>
+    <div class="dash-card">
+      <h3>Operation</h3>
+      <dl class="def-grid">
+        <div><dt>Date of test</dt><dd>{{ report.date_of_test|date:"d M Y"|default:"—" }}</dd></div>
+        <div><dt>Status</dt><dd><span class="pill {% if report.status == 'Approved' %}valid{% elif report.status == 'Sent' %}soon{% else %}expired{% endif %}">{{ report.status }}</span></dd></div>
+        <div><dt>{{ report.client|default:"Client" }} representative</dt><dd>{{ report.company_representative|default:"—" }}</dd></div>
+        <div><dt>ABC representative</dt><dd>{{ report.neos_representative|default:"—" }}</dd></div>
+      </dl>
+      {% if user.profile.can_edit %}<p style="margin:18px 0 0;"><a data-modal class="btn" href="{% url 'sgs_report:edit' report.pk %}">Edit common information</a></p>{% endif %}
+    </div>
+  </div>
+
+{% elif tab == 'result' %}
+
+  {% approval_panel report "sgs_result" show_ok=True offer_submit=True %}
+
+  <div class="stat-strip">
+    <div class="stat"><div class="stat-value">{{ progress.stations }}</div><div class="stat-label">stations</div></div>
+    <div class="stat {% if progress.stations_done == progress.stations and progress.stations %}stat-good{% else %}stat-warn{% endif %}"><div class="stat-value">{{ progress.stations_done }}</div><div class="stat-label">complete (pressure &amp; temperature)</div></div>
+    <div class="stat stat-muted"><div class="stat-value">{{ report.whp_psi_value|default:"—" }}</div><div class="stat-label">WHP / psi (last station)</div></div>
+  </div>
+
+  <div class="section-head">
+    <h2>Results table <span class="dash-sub" style="display:inline;">temperature in {{ report.get_temp_unit_display }}; the other unit and the gradients are calculated</span></h2>
+    <div class="head-actions">
+      {% if user.profile.can_download and result_released %}<a class="btn" href="{% url 'sgs_report:export_excel' report.pk %}">Download Excel</a>{% endif %}
+    </div>
+  </div>
+
+  <div class="table-wrap table-sticky">
+  <table class="data-table table-compact nowrap">
+    <thead>
+    <tr>
+      <th>Step</th><th>MD-mGL</th><th>ft GL</th><th>Start</th><th>End</th>
+      <th>Psia</th><th>Bar</th><th>{{ report.get_temp_unit_display }}</th><th>Other unit</th>
+      <th>Avg MD (to next)</th><th>Pressure grad</th><th>Temp grad</th><th>&Delta;Psi/min</th><th></th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for row in station_rows %}
+      {% if row.kind == "station" %}
+      <tr class="{% if not row.station.is_complete %}row-incomplete{% endif %}">
+        <td><b>{{ row.station.step_no }}</b></td>
+        <td>{{ row.station.md_mgl|signed:0 }}</td>
+        <td>{{ row.station.ft_gl|signed:1 }}</td>
+        <td>{{ row.station.start_display }}</td>
+        <td>{{ row.station.end_display }}</td>
+        <td>{% if row.station.pressure_psia is not None %}{{ row.station.pressure_psia|signed:3 }}{% else %}<span class="pill soon">needs entry</span>{% endif %}</td>
+        <td>{{ row.station.pressure_bar|signed:3 }}</td>
+        <td>{% if row.station.temp_value is not None %}{{ row.station.temp_value|signed:3 }}{% else %}<span class="pill soon">needs entry</span>{% endif %}</td>
+        <td>{% if row.station.is_complete %}{% if report.temp_unit == "F" %}{{ row.station.temp_c|signed:2 }} °C{% else %}{{ row.station.temp_f|signed:2 }} °F{% endif %}{% endif %}</td>
+        <td colspan="4"></td>
+        <td class="actions-cell" style="white-space:nowrap;">
+          {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'sgs_report:station_edit' row.station.pk %}">Edit</a>{% endif %}
+          {% if user.profile.can_delete %}<a data-post class="btn" href="{% url 'sgs_report:station_delete' row.station.pk %}" data-confirm="Delete this station?">Delete</a>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr class="grad">
+        <td colspan="9" style="background:var(--result-bg); color:var(--result-fg); font-style:italic; font-weight:600; border-top:1px solid var(--result-line); border-bottom:1px solid var(--result-line);"></td>
+        <td style="background:var(--result-bg); color:var(--result-fg); font-style:italic; font-weight:600; border-top:1px solid var(--result-line); border-bottom:1px solid var(--result-line);">{{ row.avg_mgl|signed:0 }}</td>
+        <td style="background:var(--result-bg); color:var(--result-fg); font-style:italic; font-weight:600; border-top:1px solid var(--result-line); border-bottom:1px solid var(--result-line);">{{ row.pressure_gradient|signed:2 }}</td>
+        <td style="background:var(--result-bg); color:var(--result-fg); font-style:italic; font-weight:600; border-top:1px solid var(--result-line); border-bottom:1px solid var(--result-line);">{{ row.temp_gradient|signed:2 }}</td>
+        <td style="background:var(--result-bg); color:var(--result-fg); font-style:italic; font-weight:600; border-top:1px solid var(--result-line); border-bottom:1px solid var(--result-line);">{{ row.delta_psi_per_min|signed:2 }}</td>
+        <td style="background:var(--result-bg); color:var(--result-fg); font-style:italic; font-weight:600; border-top:1px solid var(--result-line); border-bottom:1px solid var(--result-line);"></td>
+      </tr>
+      {% endif %}
+    {% empty %}
+    <tr><td colspan="14" class="dash-empty" style="padding:24px;">No stations yet &mdash; add the first reading below, or import the depths and times from Excel.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="cell-sub" style="margin:8px 0 0;"><span class="blue-key" style="display:inline-block; width:14px; height:10px; border-radius:3px; background:rgba(0,163,228,.45); margin-right:6px;"></span> The blue rows are the calculated averages and gradients between two stations.</p>
+
+  {% if user.profile.can_edit %}
+  <div class="dash-row dash-row-2" style="margin-top:16px;">
+    <div class="dash-card">
+      <h3>Add a station</h3>
+      <p class="cell-sub" style="margin:0 0 10px;">The date is the run start{% with run=report.run_window %}{% if run.0 %} (<b>{{ run.0|date:"d M Y" }}</b>){% endif %}{% endwith %} and rolls to the next day by itself after midnight &mdash; enter times only.</p>
+      <form method="post" class="inline-form">
+        {% csrf_token %}
+        <div><label>Step</label>{{ station_form.step_no }}</div>
+        <div><label>MD-mGL</label>{{ station_form.md_mgl }}</div>
+        <div><label>Start</label><input type="time" step="1" name="start_time" value="{{ suggested_station_time }}"></div>
+        <div><label>End</label><input type="time" step="1" name="end_time"></div>
+        <div><label>Psia</label>{{ station_form.pressure_psia }}</div>
+        <div><label>Temp ({{ report.get_temp_unit_display }})</label>{{ station_form.temp_value }}</div>
+        <button class="btn btn-primary" type="submit" name="add_station" value="1">Add station</button>
+      </form>
+    </div>
+    <div class="dash-card">
+      <h3>Import from Excel</h3>
+      <p class="cell-sub" style="margin:0 0 10px;">A file with Step / Depth (MD-mGL) / Start / End columns &mdash; you then only fill in pressure and temperature for each row.</p>
+      <form method="post" action="{% url 'sgs_report:station_import_excel' report.pk %}" enctype="multipart/form-data" class="inline-form">
+        {% csrf_token %}
+        {{ excel_import_form.excel_file }}
+        <button class="btn btn-primary" type="submit">Import</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+{% elif tab == 'final' %}
+
+  {% approval_panel report "sgs_final" show_ok=True offer_submit=True %}
+
+  <div class="section-head" style="margin-top:4px;">
+    <h2>Report files</h2>
+    <div class="head-actions">
+      {% if user.profile.can_download and final_released %}
+      <form method="post" action="{% url 'sgs_report:generate' report.pk %}" style="display:inline;">
+        {% csrf_token %}
+        <button class="btn btn-primary" type="submit">Generate report (.docx)</button>
+      </form>
+      <a class="btn btn-primary" href="{% url 'sgs_report:generate_pdf' report.pk %}">Download PDF</a>
+      {% if report.generated_file %}<a class="btn" href="{{ report.generated_file.url }}" target="_blank">Last generated ({{ report.generated_at|date:"d M Y H:i" }})</a>{% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="section-head">
+    <h2>Step 1 &middot; Sequence of events</h2>
+    {% if report.report_type == "SGS" %}<span class="cell-sub">SGS/FGS reports only need one shift.</span>{% endif %}
+  </div>
+
+  {% if shifts|length > 1 %}
+  <div class="shift-tools">
+    <button type="button" class="btn" onclick="shiftsToggle(true)">Open all shifts</button>
+    <button type="button" class="btn" onclick="shiftsToggle(false)">Close all shifts</button>
+    <span class="cell-sub">{{ shifts|length }} shifts &mdash; click a shift's title to open or close its events.</span>
+  </div>
+  {% endif %}
+
+  {% for shift in shifts %}
+  {% with sm=shift.summary %}
+  <details class="shift-card" data-shift="{{ shift.pk }}" {% if forloop.last or shifts|length == 1 %}open{% endif %}>
+    <summary class="shift-summary">
+      <span class="shift-chev" aria-hidden="true"></span>
+      <span class="shift-title">{{ shift.label }}</span>
+      {% if shift.shift_date %}<span class="shift-meta">{{ shift.shift_date|date:"d M Y" }}</span>{% endif %}
+      <span class="pill">{{ sm.count }} event{{ sm.count|pluralize }}</span>
+      {% if sm.first %}<span class="shift-meta">{{ sm.first }} &rarr; {{ sm.last }}</span>{% endif %}
+    </summary>
+  <div class="shift-body">
+    {% if user.profile.can_delete %}
+    <div class="card-head" style="justify-content:flex-end;">
+      <a data-post class="btn" href="{% url 'sgs_report:shift_delete' shift.pk %}" data-confirm="Delete this shift and all its entries?">Delete shift</a>
+    </div>
+    {% endif %}
+
+    <div class="table-wrap">
+    <table class="data-table table-compact" style="margin:0;">
+      <tr><th style="width:56px;">SR</th><th>Start</th><th>End</th><th>Total</th><th>Operation description</th><th></th></tr>
+      {% for row in shift.entry_rows %}
+        {% if row.date_changed %}
+        <tr class="date-banner"><td colspan="6">{{ row.date|date:"d/m/Y" }}</td></tr>
+        {% endif %}
+      <tr>
+        <td><b>{{ row.entry.sr }}</b></td>
+        <td>{{ row.entry.start_display }}</td>
+        <td>{{ row.entry.end_display }}</td>
+        <td>{{ row.entry.total_time }}</td>
+        <td>{{ row.entry.description|highlight_numbers }}</td>
+        <td class="actions-cell" style="white-space:nowrap;">
+          {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'sgs_report:entry_edit' row.entry.pk %}">Edit</a>{% endif %}
+          {% if user.profile.can_delete %}<a data-post class="btn" href="{% url 'sgs_report:entry_delete' row.entry.pk %}" data-confirm="Delete this row?">Delete</a>{% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" class="dash-empty" style="padding:18px;">No entries yet.</td></tr>
+      {% endfor %}
+    </table>
+    </div>
+
+    {% if user.profile.can_edit %}
+    <form method="post" action="{% url 'sgs_report:entry_add' shift.pk %}" class="inline-form" style="margin-top:12px;">
+      {% csrf_token %}
+      <div><label>SR</label><input type="text" name="sr" style="width:60px;"></div>
+      <div><label>Start</label><input type="time" step="1" name="start_time" value="{{ shift.suggested_time }}"></div>
+      <div><label>End</label><input type="time" step="1" name="end_time"></div>
+      <div style="flex:1; min-width:220px;"><label>Description</label><input type="text" name="description" style="width:100%;"></div>
+      <button class="btn btn-primary" type="submit">Add row</button>
+    </form>
+
+    <form method="post" action="{% url 'sgs_report:entry_import_excel' shift.pk %}" enctype="multipart/form-data" class="inline-form" style="margin-top:10px;">
+      {% csrf_token %}
+      <div><label>Or import events from Excel (SR / Start / End / Description columns)</label><input type="file" name="excel_file" accept=".xlsx,.xls" required></div>
+      <button class="btn" type="submit">Import</button>
+    </form>
+    {% endif %}
+  </div>
+  </details>
+  {% endwith %}
+  {% empty %}
+  <div class="dash-card" style="margin-bottom:14px;"><div class="dash-empty">No shifts yet &mdash; add one below.</div></div>
+  {% endfor %}
+
+  <script>
+  (function () {
+    var cards = document.querySelectorAll("details.shift-card");
+    cards.forEach(function (d) {
+      var key = "sgs-shift-open-" + d.dataset.shift;
+      try { var saved = localStorage.getItem(key); if (saved !== null) d.open = saved === "1"; } catch (e) {}
+      d.addEventListener("toggle", function () { try { localStorage.setItem(key, d.open ? "1" : "0"); } catch (e) {} });
+    });
+    window.shiftsToggle = function (open) { cards.forEach(function (d) { d.open = open; }); };
+  })();
+  </script>
+
+  {% if allow_more_shifts and user.profile.can_edit %}
+  <div class="dash-card" style="margin-bottom:8px;">
+    <h3>Add a shift</h3>
+    {% with run=report.run_window %}
+    <p class="cell-sub" style="margin:0 0 10px;">{% if run.0 %}Run dates: <b>{{ run.0|date:"d M Y" }}{% if run.1 and run.1 != run.0 %} to {{ run.1|date:"d M Y" }}{% endif %}</b> (from Common Information) &mdash; the date is filled in from it and can only be a day inside the run.{% else %}Set the run start and end in Common Information (or upload the gauge logs) and the dates here follow it.{% endif %} Each row you add only needs a time; it rolls to the next day after midnight.</p>
+    {% endwith %}
+    <form method="post" class="inline-form">
+      {% csrf_token %}
+      <div><label>Shift label</label>{{ shift_form.label }}</div>
+      <div><label>Shift date</label>{{ shift_form.shift_date }}</div>
+      <button class="btn btn-primary" type="submit" name="add_shift" value="1">Add shift</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <h2 style="margin-top:34px; margin-bottom:16px;">Step 2 — Images</h2>
+  <p class="page-sub">
+    Results Table and Result Plots are generated automatically from the station readings in Build SGS Result.
+    Calibration pages are pulled from the Gauge Library automatically once a gauge is selected on Common Information.
+    {% if report.report_type == "SGS" %}Pressure Build-up sections don't apply to SGS/FGS reports.{% endif %}
+    Choose a file below and it uploads immediately.
+  </p>
+  <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px;">
+    {% for slot in image_slots %}
+    <div class="nc-card" style="display:flex; flex-direction:column;">
+      <h3 style="margin:0 0 10px; font-size:14px; min-height:34px;">{{ slot.label }}</h3>
+      {% if slot.image %}
+        <img src="{{ slot.image.image.url }}" style="width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:6px; margin-bottom:8px;">
+        <div style="display:flex; gap:10px; margin-top:auto;">
+          <a href="{{ slot.image.image.url }}" target="_blank">View full size</a>
+          {% if user.profile.can_delete %}<a data-post href="{% url 'sgs_report:image_delete' slot.image.pk %}" data-confirm="Remove this image?">Remove</a>{% endif %}
+        </div>
+      {% else %}
+        <div style="width:100%; aspect-ratio:4/3; border-radius:6px; border:1px dashed var(--border, #444); display:flex; align-items:center; justify-content:center; margin-bottom:8px;">
+          <span class="page-sub">No image</span>
+        </div>
+        {% if user.profile.can_edit %}<form method="post" action="{% url 'sgs_report:image_upload' report.pk slot.key %}" enctype="multipart/form-data" style="margin-top:auto;">
+          {% csrf_token %}
+          <input type="file" name="image" accept="image/*" required style="width:100%; font-size:12px;" onchange="this.form.submit();">
+        </form>{% endif %}
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+{% elif tab == 'gauge_logs' %}
+
+  {% if user.profile.can_edit %}
+  <div class="dash-card" style="margin-bottom:16px;">
+    <h3>Gauge files <span class="dash-sub" style="display:inline; margin-left:6px;">the .txt or .csv exported from Kuster's software, or the raw .log &mdash; kept on this report</span></h3>
+    <form method="post" enctype="multipart/form-data" class="inline-form">
+      {% csrf_token %}
+      <div><label>Bottom gauge file</label><input type="file" name="bottom_log" accept=".txt,.log,.csv"></div>
+      <div><label>Top gauge file</label><input type="file" name="top_log" accept=".txt,.log,.csv"></div>
+      <button class="btn btn-primary" type="submit" name="preview_gauge_log" value="1">Upload &amp; preview</button>
+    </form>
+    <p class="cell-sub" style="margin:10px 0 0;">Uploading sets each gauge's connected and disconnected times from the file (they drive the battery hours) and fills the run start and end if they are empty. Depth markers appear on the chart wherever a station's end time falls inside the log.</p>
+  </div>
+  {% endif %}
+
+  {% if battery_summary %}
+  <div class="dash-card" style="margin-bottom:16px;">
+    <h3>Battery used on this job <span class="dash-sub" style="display:inline; margin-left:6px;">hours connected &times; the gauge's current draw</span></h3>
+    <table class="data-table table-compact" style="margin:0;">
+      <tr><th>Gauge</th><th>Battery</th><th>Connected</th><th>Used this job</th><th>Left</th></tr>
+      {% for row in battery_summary %}
+      <tr>
+        <td><b>{{ row.side }}</b></td>
+        <td><a href="{% url 'sgs_report:battery_detail' row.battery.pk %}">{{ row.battery.serial_number }}</a></td>
+        <td>{{ row.hours_text }} <span class="cell-sub">at {{ row.draw|floatformat:"-2" }} mA</span></td>
+        <td><b>{{ row.consumed|floatformat:1 }} mAh</b>{% if row.manual %} <span class="pill soon">amended</span>{% endif %}
+          {% if user.profile.can_edit %}<br><a data-modal href="{% url 'sgs_report:battery_usage_edit' row.usage.pk %}?next={{ request.get_full_path|urlencode }}">Amend</a>{% endif %}</td>
+        <td>
+          <div class="progress"><div class="progress-track"><div class="progress-fill {% if row.low %}is-over{% else %}is-done{% endif %}" style="width:{{ row.percent|floatformat:0 }}%;"></div></div><span class="progress-text"><b>{{ row.remaining|floatformat:0 }}</b> / {{ row.capacity|floatformat:0 }} mAh</span></div>
+          {% if row.low %}<span class="pill expired">low &mdash; change before the next job</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+
+  {% if gauge_log_previews %}
+  <div class="dash-card" style="margin-bottom:16px;">
+    <h3>Files for the client <span class="dash-sub" style="display:inline; margin-left:6px;">the exported .txt with its new header and new name</span></h3>
+    <table class="data-table table-compact" style="margin:0;">
+      <tr><th>Gauge</th><th>Uploaded file</th><th>Goes to the client as</th><th></th></tr>
+      {% for side, preview in gauge_log_previews.items %}
+      <tr>
+        <td><b>{{ side|title }}</b></td>
+        <td class="cell-sub">{{ preview.filename }}</td>
+        <td>
+          {% if preview.client_file.name %}
+            <b>{{ preview.client_file.name }}</b>
+            {% if preview.client_file.converted %}<div class="cell-sub">made from the CSV export &#10003;</div>
+            {% else %}<div class="cell-sub" style="color:var(--warning);">&#9888; Made from Kuster's .txt export; its readings can differ from the CSV by 0.001. Upload the CSV for an exact match.</div>{% endif %}
+            {% for w in preview.client_file.warnings %}<div class="cell-sub" style="color:var(--warning);">&#9888; {{ w }}</div>{% endfor %}
+          {% elif preview.parsed.already_calibrated %}<span class="cell-sub">{{ preview.client_file.error }}</span>
+          {% else %}<span class="cell-sub">This is a raw .log file. Upload the .txt or .csv exported from Kuster's software above to prepare the client's file.</span>{% endif %}
+        </td>
+        <td class="actions-cell">
+          {% if preview.client_file.name %}{% if user.profile.can_download and result_released %}<a class="btn btn-primary" href="{% url 'sgs_report:client_file' report.pk side %}">Download</a>{% elif user.profile.can_download %}<span class="cell-sub">after the result is approved</span>{% else %}<span class="cell-sub">Restricted</span>{% endif %}{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p class="cell-sub" style="margin:10px 0 0;">The header lists the gauge (from the uploaded file, with the number-only serial), then Client, Well NO, Type of survey, Field and Date of Survey from this report, then the units &mdash; the layout of Kuster's own export. The readings are sent exactly as they are in the file you uploaded; a CSV is laid out as the same fixed-width table.</p>
+  </div>
+
+  <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:16px;">
+    {% for side, preview in gauge_log_previews.items %}
+    <div class="nc-card" style="flex:1; min-width:320px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <h3 style="margin-top:0;">{{ side|title }} Gauge — {{ preview.filename }}</h3>
+        {% if user.profile.can_delete %}
+        <form method="post" style="display:inline;">
+          {% csrf_token %}
+          <input type="hidden" name="side" value="{{ side }}">
+          <button class="btn" type="submit" name="remove_gauge_log" value="1" data-confirm="Remove this gauge log file from the report?">Remove</button>
+        </form>
+        {% endif %}
+      </div>
+      <table class="data-table">
+        <tr><td>Model</td><td>{{ preview.parsed.model_number }}</td></tr>
+        <tr><td>Serial Number</td><td>{{ preview.parsed.serial_number }}</td></tr>
+        <tr><td>Calibration Date</td><td>{{ preview.parsed.calibration_date }}</td></tr>
+        <tr><td>Sample Rate</td><td>{{ preview.parsed.sample_rate }} s</td></tr>
+        <tr><td>Start</td><td>{{ preview.parsed.start_time }}</td></tr>
+        <tr><td>End</td><td>{{ preview.parsed.end_time }}</td></tr>
+        <tr><td>Duration</td><td>{{ preview.parsed.duration_seconds|floatformat:0 }} s ({{ preview.parsed.num_samples }} samples)</td></tr>
+      </table>
+      {% if user.profile.can_edit %}
+      <form class="apply-gauge-times-form" style="margin-top:10px;"
+            data-side="{{ side }}" data-start-iso="{{ preview.start_iso }}" data-end-iso="{{ preview.end_iso }}">
+        {% csrf_token %}
+        <button class="btn" type="submit">Use these times for {{ side|title }} Gauge Connected/Disconnected</button>
+        <span class="page-sub apply-gauge-times-status" style="margin-left:8px;"></span>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="nc-card" style="margin-bottom:24px;">
+    <div style="display:flex; gap:16px; align-items:flex-end; margin-bottom:12px; flex-wrap:wrap;">
+      <div>
+        <label class="page-sub">Show</label><br>
+        <select id="gauge-select" onchange="renderSelected()">
+          {% if gauge_log_previews.bottom %}<option value="bottom">Bottom Gauge</option>{% endif %}
+          {% if gauge_log_previews.top %}<option value="top">Top Gauge</option>{% endif %}
+          {% if gauge_log_previews.bottom and gauge_log_previews.top %}<option value="comparison">Compare Both</option>{% endif %}
+        </select>
+      </div>
+      <div>
+        <label class="page-sub">Series</label><br>
+        <select id="series-select" onchange="renderSelected()">
+          <option value="pressure">Pressure</option>
+          <option value="temperature">Temperature</option>
+          <option value="both">Pressure &amp; Temperature</option>
+        </select>
+      </div>
+      <div>
+        <label class="page-sub">Depth labels</label><br>
+        <button type="button" class="btn" id="depth-label-toggle" onclick="toggleDepthLabels()">Hide</button>
+      </div>
+      <div>
+        <label class="page-sub">Mouse drag</label><br>
+        <button type="button" class="btn btn-primary" id="mode-zoom" onclick="setDragMode('zoom')">Zoom box</button>
+        <button type="button" class="btn" id="mode-pan" onclick="setDragMode('pan')">Move (pan)</button>
+      </div>
+      <div>
+        <label class="page-sub">View</label><br>
+        <button type="button" class="btn" onclick="renderSelected()">Reset view</button>
+        <label class="page-sub" style="margin-left:10px; white-space:nowrap;"><input type="checkbox" id="autofit-y"> Auto-fit height to the time in view</label>
+      </div>
+    </div>
+    <p id="gauge-chart-title" style="color:#c00000; font-weight:700; font-size:14px; margin:0 0 6px;"></p>
+    <style>#gauge-chart .hoverlayer .hovertext { display: none; }</style>
+    <div id="gauge-chart" style="width:100%; height:480px;"></div>
+    <p id="hover-readout" class="page-sub" style="margin:6px 0 0; font-weight:600; min-height:1.3em;"></p>
+    {% if user.profile.can_edit %}
+    <p class="page-sub" style="margin-top:6px;">Click a point on the chart, then choose which station to fill in its pressure/temperature from that point.</p>
+    <div id="point-picker" class="nc-card" style="display:none; margin-top:10px; max-width:560px;">
+      <p class="page-sub" id="point-picker-summary" style="margin:0 0 10px;"></p>
+      <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+        <div>
+          <label class="page-sub" style="display:block;">Station</label>
+          <select id="point-picker-station" style="min-width:220px;">
+            <option value="">Select a station…</option>
+            {% for s in all_stations %}
+            <option value="{{ s.pk }}" data-depth="{{ s.md_mgl }}">Step {{ s.step_no }} — MD {{ s.md_mgl }}{% if s.is_complete %} (already filled in){% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button class="btn btn-primary" type="button" id="point-picker-add">Update Station</button>
+        <button class="btn" type="button" onclick="document.getElementById('point-picker').style.display='none';">Cancel</button>
+      </div>
+      <p class="page-sub" id="point-picker-status" style="margin:8px 0 0;"></p>
+    </div>
+    {% endif %}
+    <p class="page-sub" style="margin-top:8px;"><b>Zoom box</b>: drag a rectangle to zoom into both time and pressure/temperature. <b>Move (pan)</b>: drag to slide the chart so what you want is in the middle. Scroll the wheel to zoom (over an axis it zooms that axis only). Double-click or <b>Reset view</b> to start again. Tick <b>Auto-fit height</b> if you only care about a stretch of time: whatever time you select, the height stretches to the readings in it.</p>
+  </div>
+
+  <script src="{% static 'sgs_report/plotly.min.js' %}"></script>
+  <script>
+    {% if gauge_log_previews.bottom %}var data_bottom = {{ gauge_log_previews.bottom.chart_json|safe }};{% else %}var data_bottom = null;{% endif %}
+    {% if gauge_log_previews.top %}var data_top = {{ gauge_log_previews.top.chart_json|safe }};{% else %}var data_top = null;{% endif %}
+    var REPORT_WELL_NAME = "{{ report.well_name|escapejs }}";
+    var REPORT_DATE = "{{ report.date_of_test|default:'' }}";
+    var REPORT_PK = {{ report.pk }};
+
+    // ── the chart follows Light / Night: colours come from the page's own theme roles ──
+    var LINE_NIGHT = {'#43358A': '#A99FEA', '#00A3E4': '#00A3E4', '#C62828': '#FF8A8A', '#E39A00': '#F5B84D'};
+    var LINE_LIGHT = {}; Object.keys(LINE_NIGHT).forEach(function (k) { LINE_LIGHT[LINE_NIGHT[k]] = k; });
+    function chartNight() { return document.documentElement.getAttribute('data-theme') === 'dark'; }
+    function lineColour(c) { return chartNight() && LINE_NIGHT[c] ? LINE_NIGHT[c] : c; }
+    function chartColours() {
+      var css = getComputedStyle(document.documentElement);
+      var pick = function (name, fallback) { return (css.getPropertyValue(name) || '').trim() || fallback; };
+      return {bg: pick('--chart-bg', '#FFFFFF'), text: pick('--chart-text', '#1B1830'), grid: pick('--chart-grid', '#DDDCE6'),
+              spike: chartNight() ? '#B8B5CC' : '#666666'};
+    }
+    window.addEventListener('themechange', function () {
+      var gd = document.getElementById('gauge-chart');
+      if (!gd || !gd.data || !window.Plotly) return;
+      var c = chartColours();
+      var update = {paper_bgcolor: c.bg, plot_bgcolor: c.bg, 'font.color': c.text,
+                    'xaxis.gridcolor': c.grid, 'yaxis.gridcolor': c.grid, 'xaxis.zerolinecolor': c.grid, 'yaxis.zerolinecolor': c.grid,
+                    'xaxis.linecolor': c.grid, 'yaxis.linecolor': c.grid, 'xaxis.spikecolor': c.spike, 'yaxis.spikecolor': c.spike};
+      if (gd.layout && gd.layout.yaxis2) update['yaxis2.gridcolor'] = c.grid;
+      Plotly.relayout(gd, update);                                   // colours only: the zoom the person chose is kept
+      gd.data.forEach(function (trace, i) {
+        var now = trace.line && trace.line.color;
+        if (now) Plotly.restyle(gd, {'line.color': lineColour(LINE_LIGHT[now] || now)}, [i]);
+      });
+    });
+
+    function gaugeLogTrace(data, seriesKey, name, yaxis, color, dash) {
+      var trace = {x: data.timestamps, y: data[seriesKey], type: 'scatter', mode: 'lines',
+                   line: {width: 1.5}, name: name};
+      if (yaxis) trace.yaxis = yaxis;
+      if (color) trace.line.color = color;
+      if (dash) trace.line.dash = dash;
+      return trace;
+    }
+    function findNearestValue(data, seriesKey, targetIsoTime) {
+      var target = new Date(targetIsoTime).getTime();
+      var times = data.timestamps;
+      var values = data[seriesKey];
+      var lo = 0, hi = times.length - 1;
+      while (lo < hi) {
+        var mid = Math.floor((lo + hi) / 2);
+        if (new Date(times[mid]).getTime() < target) lo = mid + 1;
+        else hi = mid;
+      }
+      return values[lo];
+    }
+    var chartDragMode = 'zoom';
+    function setDragMode(mode) {
+      chartDragMode = mode;
+      document.getElementById('mode-zoom').className = 'btn' + (mode === 'zoom' ? ' btn-primary' : '');
+      document.getElementById('mode-pan').className = 'btn' + (mode === 'pan' ? ' btn-primary' : '');
+      Plotly.relayout('gauge-chart', {dragmode: mode});
+    }
+    function epochs(data) {
+      if (!data._t) data._t = data.timestamps.map(function(t) { return new Date(t).getTime(); });
+      return data._t;
+    }
+    function visibleExtent(dataSets, seriesKey, t0, t1) {
+      var lo = Infinity, hi = -Infinity;
+      dataSets.forEach(function(data) {
+        var t = epochs(data), v = data[seriesKey] || [];
+        for (var i = 0; i < t.length; i++) {
+          if (t[i] < t0 || t[i] > t1) continue;
+          if (v[i] < lo) lo = v[i];
+          if (v[i] > hi) hi = v[i];
+        }
+      });
+      return lo === Infinity ? null : [lo, hi];
+    }
+    function paddedRange(extent) {
+      var span = extent[1] - extent[0];
+      var pad = span > 0 ? span * 0.12 : Math.max(Math.abs(extent[0]) * 0.001, 0.001);
+      return [extent[0] - pad, extent[1] + pad];
+    }
+    // After a zoom or move in time, stretch the height to the readings that are in view, so small
+    // changes in pressure / temperature show instead of sitting flat on a 0 - 3000 psi axis.
+    function fitHeight(which, seriesKey, ev) {
+      var x0 = ev['xaxis.range[0]'], x1 = ev['xaxis.range[1]'];
+      if (x0 === undefined && ev['xaxis.range']) { x0 = ev['xaxis.range'][0]; x1 = ev['xaxis.range'][1]; }
+      if (x0 === undefined) return null;
+      var t0 = new Date(String(x0).replace(' ', 'T')).getTime(), t1 = new Date(String(x1).replace(' ', 'T')).getTime();
+      var dataSets = (which === 'comparison' ? [data_bottom, data_top] : [which === 'bottom' ? data_bottom : data_top]).filter(Boolean);
+      var update = {}, any = false;
+      var pressureOn = seriesKey === 'pressure' || seriesKey === 'both';
+      var tempOn = seriesKey === 'temperature' || seriesKey === 'both';
+      if (pressureOn) {
+        var pe = visibleExtent(dataSets, 'pressure', t0, t1);
+        if (pe) { var pr = paddedRange(pe); update['yaxis.range'] = pr; update['yaxis.dtick'] = null; any = true; }
+      }
+      if (tempOn) {
+        var te = visibleExtent(dataSets, 'temperature', t0, t1);
+        if (te) {
+          var tr = paddedRange(te);
+          var axis = seriesKey === 'both' ? 'yaxis2' : 'yaxis';
+          update[axis + '.range'] = tr; update[axis + '.dtick'] = null; any = true;
+        }
+      }
+      return any ? update : null;
+    }
+    var showDepthLabels = true;
+    function toggleDepthLabels() {
+      showDepthLabels = !showDepthLabels;
+      document.getElementById('depth-label-toggle').textContent = showDepthLabels ? 'Hide' : 'Show';
+      renderSelected();
+    }
+    function gaugeLogExtras(dataSets, seriesKey) {
+      // Depth labels sit right at the actual PRESSURE curve value for
+      // the time they correspond to (an arrow points at the exact
+      // crossing point). No vertical guide-line is drawn anymore --
+      // just the label box itself, per request. showDepthLabels lets
+      // the Hide/Show toggle clear them entirely without touching the
+      // curves.
+      var annotations = [], shapes = [], seen = {};
+      if (!showDepthLabels) return {annotations: annotations, shapes: shapes};
+      dataSets.forEach(function(data) {
+        (data.annotations || []).forEach(function(a) {
+          var key = a.station_id != null ? 'st' + a.station_id : a.time;
+          if (seen[key]) return;
+          seen[key] = true;
+          var lookupSeries = seriesKey === 'temperature' ? 'temperature' : 'pressure';
+          var val = findNearestValue(data, lookupSeries, a.time);
+          annotations.push({x: a.time, y: val, yref: 'y', xref: 'x', text: String(a.md_mgl),
+                             showarrow: false, yshift: 15,
+                             bgcolor: '#fff', bordercolor: '#999', font: {size: 10, color: '#333'}});
+        });
+      });
+      return {annotations: annotations, shapes: shapes};
+    }
+    function axisTitle(seriesKey) {
+      return seriesKey === 'pressure' ? 'Pressure (raw)' : 'Temperature (\u00b0C)';
+    }
+    function fixedAxisRange(dataSets, seriesKey, step, capMax, fillFraction, startAtZero, window) {
+      // Fixed tick spacing (e.g. every 500 psi, every 20\u00b0C). Pressure
+      // always starts its range at 0. Temperature instead auto-scales
+      // BOTH ends to the actual data (floor/ceil to the nearest step),
+      // matching how the Kuster software itself charts it. When a
+      // window (start/end Date) is given, only samples inside it feed
+      // the min/max -- a raw gauge log includes idle time before RIH
+      // and after POOH where temperature reads close to ambient surface
+      // temperature, well below the actual downhole range; including
+      // that idle tail drags the floor down and makes the real
+      // descent look flatter than it should next to pressure.
+      var maxVal = -Infinity, minVal = Infinity;
+      dataSets.forEach(function(data) {
+        var times = data.timestamps, values = data[seriesKey] || [];
+        for (var i = 0; i < values.length; i++) {
+          if (window) {
+            var t = new Date(times[i]).getTime();
+            if (t < window[0] || t > window[1]) continue;
+          }
+          var v = values[i];
+          if (v > maxVal) maxVal = v;
+          if (v < minVal) minVal = v;
+        }
+      });
+      if (maxVal === -Infinity) { maxVal = step; minVal = 0; }
+      if (startAtZero === false) {
+        var bottom = Math.floor(minVal / step) * step;
+        var top2 = Math.ceil(maxVal / step) * step;
+        if (top2 <= bottom) top2 = bottom + step;
+        return {range: [bottom, top2], dtick: step};
+      }
+      var target = fillFraction ? maxVal / fillFraction : maxVal;
+      var top = Math.ceil(target / step) * step;
+      if (capMax && top > capMax) top = capMax;
+      if (top <= 0) top = step;
+      return {range: [0, top], dtick: step};
+    }
+    function activeWindow(dataSets) {
+      // The active test window is the span between the first and last
+      // depth marker (station time) -- everything outside it is idle
+      // surface time before RIH or after POOH, not part of the test.
+      var times = [];
+      dataSets.forEach(function(data) {
+        (data.annotations || []).forEach(function(a) { times.push(new Date(a.time).getTime()); });
+      });
+      if (!times.length) return null;
+      return [Math.min.apply(null, times), Math.max.apply(null, times)];
+    }
+    function updateGaugeTitle(which) {
+      var gaugeLabel = which === 'comparison'
+        ? [data_bottom, data_top].filter(Boolean).map(function(d) { return d.label; }).join(' & ')
+        : (which === 'bottom' ? data_bottom : data_top).label;
+      var parts = [];
+      if (REPORT_WELL_NAME) parts.push('Well: ' + REPORT_WELL_NAME);
+      if (REPORT_DATE) parts.push('Date: ' + REPORT_DATE);
+      if (gaugeLabel) parts.push('Gauge: ' + gaugeLabel);
+      document.getElementById('gauge-chart-title').textContent = parts.join('  |  ');
+    }
+    function buildTraces(which, seriesKey) {
+      var traces = [];
+      var gaugesToPlot = which === 'comparison' ? [['bottom', data_bottom], ['top', data_top]]
+                        : [[which, which === 'bottom' ? data_bottom : data_top]];
+      gaugesToPlot.forEach(function(pair) {
+        var side = pair[0], data = pair[1];
+        var pressureColor = lineColour(side === 'bottom' ? '#43358A' : '#00A3E4');
+        var tempColor = lineColour(side === 'bottom' ? '#C62828' : '#E39A00');
+        if (seriesKey === 'both') {
+          traces.push(gaugeLogTrace(data, 'pressure', data.label + ' \u2014 Pressure', 'y', pressureColor, 'solid'));
+          traces.push(gaugeLogTrace(data, 'temperature', data.label + ' \u2014 Temperature', 'y2', tempColor, 'solid'));
+        } else {
+          traces.push(gaugeLogTrace(data, seriesKey, data.label,
+                                     null, seriesKey === 'pressure' ? pressureColor : tempColor, 'solid'));
+        }
+      });
+      return traces;
+    }
+    function renderSelected() {
+      var which = document.getElementById('gauge-select').value;
+      var seriesKey = document.getElementById('series-select').value;
+      var dataSets = which === 'comparison' ? [data_bottom, data_top] : [which === 'bottom' ? data_bottom : data_top];
+      var extra = gaugeLogExtras(dataSets, seriesKey);
+      var traces = buildTraces(which, seriesKey);
+      updateGaugeTitle(which);
+      var layout = {
+        font: {family: 'Barlow, "Segoe UI", sans-serif', size: 13, color: chartColours().text}, colorway: ['#43358A', '#00A3E4', '#B87100', '#17803D'],
+        paper_bgcolor: chartColours().bg, plot_bgcolor: chartColours().bg,
+        margin: {t: 20, b: 40, l: 55, r: seriesKey === 'both' ? 55 : 20},
+        hovermode: 'x',
+        dragmode: chartDragMode,
+        xaxis: {title: 'Time', showspikes: true, spikemode: 'across', spikesnap: 'cursor',
+                spikedash: 'solid', spikecolor: chartColours().spike, spikethickness: 1,
+                gridcolor: chartColours().grid, zerolinecolor: chartColours().grid, linecolor: chartColours().grid},
+        yaxis: {title: seriesKey === 'both' ? axisTitle('pressure') : axisTitle(seriesKey), zeroline: false, fixedrange: false,
+                showspikes: true, spikemode: 'across', spikesnap: 'cursor', spikedash: 'solid', spikecolor: chartColours().spike, spikethickness: 1,
+                gridcolor: chartColours().grid, zerolinecolor: chartColours().grid, linecolor: chartColours().grid},
+        annotations: extra.annotations,
+        shapes: extra.shapes,
+        showlegend: (which === 'comparison' || seriesKey === 'both'),
+        legend: {orientation: 'h', x: 0.5, xanchor: 'center', y: -0.18, yanchor: 'top'},
+      };
+      // Axis range is always computed from EVERY available gauge, not
+      // just whichever one(s) are currently shown -- otherwise switching
+      // Show/Series made the scale recompute per-selection, and the
+      // same curve could shift up/down or rescale each time you toggled
+      // between views instead of staying visually stable.
+      var allData = [data_bottom, data_top].filter(Boolean);
+      var win = activeWindow(allData);
+      if (seriesKey === 'both' || seriesKey === 'pressure') {
+        var pRange = fixedAxisRange(allData, 'pressure', 500, null, null, true, win);
+        layout.yaxis.range = pRange.range;
+        layout.yaxis.dtick = pRange.dtick;
+      }
+      if (seriesKey === 'both') {
+        var tRange = fixedAxisRange(allData, 'temperature', 20, null, null, false, win);
+        layout.yaxis2 = {
+          title: axisTitle('temperature'), overlaying: 'y', side: 'right',
+          range: tRange.range, dtick: tRange.dtick, zeroline: false, fixedrange: false,
+          griddash: 'dot', gridcolor: chartColours().grid,
+        };
+      } else if (seriesKey === 'temperature') {
+        var tRangeOnly = fixedAxisRange(allData, 'temperature', 20, null, null, false, win);
+        layout.yaxis.range = tRangeOnly.range;
+        layout.yaxis.dtick = tRangeOnly.dtick;
+      }
+      Plotly.newPlot('gauge-chart', traces, layout, {responsive: true, scrollZoom: true, displaylogo: false}).then(function(gd) {
+        gd.removeAllListeners('plotly_click');
+        gd.removeAllListeners('plotly_relayout');
+        gd.on('plotly_relayout', function(ev) {
+          if (ev['xaxis.autorange'] || ev.autosize) { return; }
+          // Fit height ON: whatever time span was zoomed or moved to, the height follows the readings in view.
+          if (document.getElementById('autofit-y').checked) {
+            var update = fitHeight(document.getElementById('gauge-select').value, document.getElementById('series-select').value, ev);
+            if (update) { Plotly.relayout('gauge-chart', update); return; }
+          }
+          // Free zoom: once the height has been changed, the fixed 500 psi / 20 degree gridlines are too coarse.
+          var loosen = {};
+          if (ev['yaxis.range[0]'] !== undefined || ev['yaxis.range']) loosen['yaxis.dtick'] = null;
+          if (ev['yaxis2.range[0]'] !== undefined || ev['yaxis2.range']) loosen['yaxis2.dtick'] = null;
+          if (Object.keys(loosen).length) Plotly.relayout('gauge-chart', loosen);
+        });
+        gd.removeAllListeners('plotly_hover');
+        gd.removeAllListeners('plotly_unhover');
+
+        function resolvePoint(evt) {
+          // With hovermode:'x', evt.points contains one entry PER TRACE
+          // that shares this exact x -- so in "both" mode this is the
+          // pressure point AND the temperature point together, read
+          // directly from Plotly itself rather than re-deriving them
+          // with a separate nearest-time lookup.
+          var clickedTime = evt.points[0].x;
+          var pressureVal = null, tempVal = null;
+          var singleTempTrace = (seriesKey === 'temperature' && evt.points.length === 1);
+          evt.points.forEach(function(pt) {
+            var name = pt.data.name || '';
+            var isTemp = pt.data.yaxis === 'y2' || name.indexOf('Temperature') !== -1 || singleTempTrace;
+            if (isTemp) { tempVal = pt.y; } else { pressureVal = pt.y; }
+          });
+          var sourceData = which === 'top' ? data_top : data_bottom;
+          if (which === 'comparison') sourceData = data_bottom || data_top;
+          if (pressureVal === null) pressureVal = findNearestValue(sourceData, 'pressure', clickedTime);
+          if (tempVal === null) tempVal = findNearestValue(sourceData, 'temperature', clickedTime);
+          return {timestamp_iso: clickedTime, pressure_psia: pressureVal, temp_value: tempVal};
+        }
+
+        // Live preview as the mouse moves -- lets you confirm you're at
+        // the right spot BEFORE committing with a click, since pressure
+        // and temperature can diverge sharply during descent and a
+        // click that's off by even a little can land somewhere very
+        // different from where it visually looked like you were.
+        gd.on('plotly_hover', function(evt) {
+          var pt = resolvePoint(evt);
+          document.getElementById('hover-readout').textContent =
+            'Hovering \u2014 Time: ' + pt.timestamp_iso + '  |  Pressure: ' + pt.pressure_psia.toFixed(3) + '  |  Temp: ' + pt.temp_value.toFixed(3) + '  (click to lock this in)';
+        });
+        gd.on('plotly_unhover', function() {
+          document.getElementById('hover-readout').textContent = '';
+        });
+        gd.on('plotly_click', function(evt) {
+          if (!document.getElementById('point-picker')) return;
+          var pt = resolvePoint(evt);
+          window.pickedPoint = pt;
+          document.getElementById('point-picker-summary').textContent =
+            'Time: ' + pt.timestamp_iso + '  |  Pressure: ' + pt.pressure_psia.toFixed(3) + '  |  Temp: ' + pt.temp_value.toFixed(3);
+          document.getElementById('point-picker-status').textContent = '';
+          document.getElementById('point-picker').style.display = 'block';
+        });
+      });
+    }
+    renderSelected();
+
+    if (document.getElementById('point-picker-add')) document.getElementById('point-picker-add').addEventListener('click', function() {
+      var stationSelect = document.getElementById('point-picker-station');
+      var stationId = stationSelect.value;
+      var statusEl = document.getElementById('point-picker-status');
+      if (!stationId) { statusEl.textContent = 'Select a station first.'; return; }
+      var depth = stationSelect.selectedOptions[0].getAttribute('data-depth');
+      var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+      var body = new URLSearchParams({
+        station_id: stationId,
+        timestamp_iso: window.pickedPoint.timestamp_iso,
+        pressure_psia: window.pickedPoint.pressure_psia,
+        temp_value: window.pickedPoint.temp_value,
+      });
+      statusEl.textContent = 'Saving...';
+      fetch('/sgs-report/' + REPORT_PK + '/station-from-chart/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded'},
+        body: body.toString(),
+      }).then(function(resp) {
+        statusEl.textContent = resp.ok ? 'Station updated \u2014 check the Build SGS Result tab.' : 'Something went wrong.';
+        if (resp.ok) {
+          // Update the chart's own annotation immediately instead of
+          // waiting for a page reload -- this is also what was causing
+          // duplicates before: the chart's depth label was baked in at
+          // page-load time and never reflected a later update, so an
+          // old label from before you picked a new point could still
+          // be sitting there.
+          var stationIdNum = parseInt(stationId, 10);
+          [data_bottom, data_top].forEach(function(data) {
+            if (!data) return;
+            data.annotations = (data.annotations || []).filter(function(a) { return a.station_id !== stationIdNum; });
+            data.annotations.push({time: window.pickedPoint.timestamp_iso, md_mgl: depth, station_id: stationIdNum});
+          });
+          renderSelected();
+        }
+      }).catch(function() { statusEl.textContent = 'Network error.'; });
+    });
+
+    // Submits "Use these times" in the background via fetch() instead of
+    // a normal form POST -- a normal submit would navigate the page away
+    // and back, and since only the times (not the original .log file) get
+    // resubmitted, the preview and chart would be lost and require
+    // re-uploading the file just to see them again.
+    document.querySelectorAll('.apply-gauge-times-form').forEach(function(form) {
+      form.addEventListener('submit', function(evt) {
+        evt.preventDefault();
+        var statusEl = form.querySelector('.apply-gauge-times-status');
+        var csrfToken = form.querySelector('[name=csrfmiddlewaretoken]').value;
+        var body = new URLSearchParams({
+          apply_gauge_times: '1',
+          side: form.dataset.side,
+          start_iso: form.dataset.startIso,
+          end_iso: form.dataset.endIso,
+        });
+        statusEl.textContent = 'Saving...';
+        fetch(window.location.pathname + '?tab=gauge_logs', {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': csrfToken,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: body.toString(),
+        }).then(function(resp) {
+          statusEl.textContent = resp.ok ? 'Saved \u2014 Common Information updated.' : 'Something went wrong.';
+        }).catch(function() {
+          statusEl.textContent = 'Network error \u2014 not saved.';
+        });
+      });
+    });
+  </script>
+  {% endif %}
+
+{% endif %}
+{% endblock %}

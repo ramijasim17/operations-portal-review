@@ -1,0 +1,50 @@
+/* Whiteboard editor. The page itself is always white paper, in Light and Night mode alike. */
+#wb-app{max-width:none; margin:0;}
+.wb-bar{
+  position:relative; z-index:15; display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center;
+  padding:10px 12px; margin:0 0 14px; border:1px solid var(--border); border-radius:12px;
+  background:var(--surface); box-shadow:0 6px 18px -10px rgba(27,24,48,.35);
+}
+.wb-bar input[type=text]{flex:1 1 220px; min-width:160px; font-weight:600;}
+.wb-group{display:flex; gap:4px; align-items:center; flex-wrap:wrap;}
+.wb-bar button, .wb-bar select{
+  min-height:38px; padding:6px 10px; border:1px solid var(--border); border-radius:8px;
+  background:var(--surface); color:var(--text); font:inherit; font-size:13.5px; cursor:pointer;
+}
+.wb-bar button:hover{background:var(--hover);}
+.wb-bar button.on, .wb-bar button[aria-pressed="true"]{border-color:var(--brand-ui); box-shadow:0 0 0 2px var(--ring); }
+.wb-bar button.btn-primary{background:var(--brand-ui); border-color:var(--brand-ui); color:#fff;}
+#wb-colors button{width:30px; min-height:30px; padding:0; border-radius:50%; border:2px solid var(--border);}
+#wb-colors button.on{border-color:var(--text); box-shadow:0 0 0 2px var(--ring);}
+#wb-colors input[type=color]{width:34px; height:34px; padding:0; border:none; background:none; cursor:pointer;}
+#wb-pages{flex:1; min-width:0; display:flex; flex-direction:column; gap:22px; align-items:center;}
+.wb-page{position:relative; width:100%; max-width:none; box-shadow:0 10px 30px -14px rgba(27,24,48,.5); border:1px solid var(--border); background:#fff;}
+.wb-page canvas{display:block; width:100%; height:auto; touch-action:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; background:#fff;}
+.wb-page.is-eraser canvas{cursor:cell;}
+.wb-page.is-text canvas{cursor:text;}
+.wb-page canvas{cursor:crosshair;}
+.wb-textbox{position:absolute; min-width:120px; padding:2px 4px; border:1px dashed #43358A; background:rgba(255,255,255,.9);
+  font-family:system-ui, -apple-system, "Segoe UI", sans-serif; line-height:1.25; resize:none; overflow:hidden; outline:none; color:#1B1830;}
+@media print{ .wb-bar{display:none;} }
+
+/* The paper fills the width of the window; the tools float over its bottom edge. */
+body.wb-wide .main{padding-left:14px; padding-right:14px;}
+body.wb-full .sidebar, body.wb-full .nav-backdrop{display:none;}
+body.wb-full .menu-bar{display:none;}
+.wb-body{display:block;}
+#wb-pages{align-items:stretch; gap:18px;}
+.wb-palette{
+  position:sticky; bottom:58px; z-index:25; margin:14px auto 0; width:max-content; max-width:100%;
+  display:flex; flex-wrap:wrap; justify-content:center; gap:6px 10px; align-items:center;
+  padding:8px 12px; border:1px solid var(--border-strong); border-radius:14px; background:var(--surface);
+  box-shadow:0 10px 28px -8px rgba(27,24,48,.45);
+}
+.wb-palette .wb-group{flex:none; flex-wrap:nowrap; gap:4px; padding:0 10px 0 0; border-right:1px solid var(--border); border-bottom:none;}
+.wb-palette .wb-group:last-child{border-right:none; padding-right:0;}
+.wb-palette button{min-height:36px; padding:4px 9px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; font-size:13px; cursor:pointer; white-space:nowrap;}
+.wb-palette button:hover{background:var(--hover);}
+.wb-palette button.on{border-color:var(--brand-ui); box-shadow:0 0 0 2px var(--ring);}
+.wb-palette #wb-colors button{width:28px; min-height:28px; height:28px; padding:0; border-radius:50%; border:2px solid var(--border);}
+.wb-palette #wb-colors button.on{border-color:var(--text);}
+.wb-palette #wb-colors input[type=color]{width:30px; height:30px; padding:0; border:none; background:none; cursor:pointer;}
+@media print{ .wb-palette{display:none;} }

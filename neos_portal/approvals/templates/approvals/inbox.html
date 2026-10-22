@@ -1,0 +1,96 @@
+{% extends "core/base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Approvals</h1>
+    <p class="page-sub">{% if can_decide %}Work that Level 2 added and that waits for you. Approve it to release it, or reject it with a reason.{% else %}What you sent for approval, and what happened to it.{% endif %}</p>
+  </div>
+</div>
+
+<div class="stat-strip">
+  {% if can_decide %}<div class="stat {% if waiting %}stat-warn{% else %}stat-good{% endif %}"><div class="stat-value">{{ waiting|length }}</div><div class="stat-label">waiting for approval</div></div>{% endif %}
+  <div class="stat {% if mine %}stat-warn{% else %}stat-muted{% endif %}"><div class="stat-value">{{ mine|length }}</div><div class="stat-label">my requests still open</div></div>
+  <div class="stat {% if rejected_mine %}stat-bad{% else %}stat-muted{% endif %}"><div class="stat-value">{{ rejected_mine }}</div><div class="stat-label">of mine rejected</div></div>
+</div>
+
+<div class="tabs-row">
+  {% if can_decide %}<a href="?tab=waiting" class="tab-box {% if tab == 'waiting' %}active{% endif %}">Waiting for approval <span class="tab-count">{{ waiting|length }}</span></a>{% endif %}
+  <a href="?tab=mine" class="tab-box {% if tab == 'mine' %}active{% endif %}">My requests <span class="tab-count">{{ mine|length }}</span></a>
+  <a href="?tab=history" class="tab-box {% if tab == 'history' %}active{% endif %}">History</a>
+</div>
+
+{% if tab == 'waiting' and can_decide %}
+  {% if waiting %}
+  <p class="cell-sub" style="margin:0 0 10px;">{% for label, n in by_kind.items %}<span class="pill">{{ label }} &middot; {{ n }}</span> {% endfor %}</p>
+  <form method="post" action="{% url 'approvals:bulk' %}" id="bulk-form">{% csrf_token %}
+  <div class="table-wrap">
+  <table class="data-table table-compact">
+    <tr><th style="width:34px;"><input type="checkbox" onclick="document.querySelectorAll('.pick').forEach(function(b){b.checked=this.checked}.bind(this))" title="Select all"></th><th>Item</th><th>Sent by</th><th style="min-width:250px;">Decision</th></tr>
+    {% for row in waiting %}
+    <tr>
+      <td><input type="checkbox" class="pick" name="ids" value="{{ row.approval.pk }}"></td>
+      <td>
+        <span class="pill">{{ row.kind.label }}</span>
+        <div class="cell-title" style="margin-top:4px;">{% if row.url %}<a href="{{ row.url }}">{{ row.approval.label }}</a>{% else %}{{ row.approval.label }}{% endif %}</div>
+        <div class="cell-sub">{{ row.kind.hint }}</div>
+      </td>
+      <td>{{ row.approval.submitted_by.username|default:"—" }}<div class="cell-sub">{{ row.approval.submitted_at|timesince }} ago</div></td>
+      <td>
+        <div class="decide-col">
+          <input type="text" form="decide-{{ row.approval.pk }}" name="note" placeholder="Reason (needed to reject)">
+          <div class="decide-buttons">
+            <button class="btn btn-primary" type="submit" form="decide-{{ row.approval.pk }}" name="decision" value="approve">Approve</button>
+            <button class="btn" type="submit" form="decide-{{ row.approval.pk }}" name="decision" value="reject">Reject</button>
+          </div>
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+  <p style="margin-top:12px;"><button class="btn btn-primary" type="submit" data-confirm="Approve every ticked item?">Approve ticked</button></p>
+  </form>
+  {% for row in waiting %}<form id="decide-{{ row.approval.pk }}" method="post" action="{% url 'approvals:decide' row.approval.pk %}" data-confirm="Save this decision?">{% csrf_token %}</form>{% endfor %}
+  {% else %}
+  <div class="dash-card"><div class="dash-empty">Nothing is waiting &mdash; you're all caught up.</div></div>
+  {% endif %}
+
+{% elif tab == 'history' %}
+  <div class="table-wrap">
+  <table class="data-table table-compact">
+    <tr><th>When</th><th>What</th><th>Item</th><th>Action</th><th>By</th><th>Note</th></tr>
+    {% for h in history %}
+    <tr>
+      <td class="cell-sub">{{ h.at|date:"d M Y H:i" }}</td>
+      <td>{{ h.kind }}</td>
+      <td>{{ h.label }}</td>
+      <td><span class="pill {% if h.action == 'rejected' %}expired{% elif h.action == 'approved' or h.action == 'auto' %}valid{% else %}soon{% endif %}">{{ h.action }}</span></td>
+      <td>{{ h.by.username|default:"—" }}</td>
+      <td class="cell-sub">{{ h.note }}</td>
+    </tr>
+    {% empty %}<tr><td colspan="6" class="dash-empty" style="padding:20px;">No decisions yet.</td></tr>{% endfor %}
+  </table>
+  </div>
+
+{% else %}
+  <div class="table-wrap">
+  <table class="data-table table-compact">
+    <tr><th>What</th><th>Item</th><th>Status</th><th>Sent</th><th>Decision</th><th></th></tr>
+    {% for row in mine %}
+    <tr>
+      <td><span class="pill">{{ row.kind.label }}</span></td>
+      <td>{% if row.url %}<a href="{{ row.url }}">{{ row.approval.label }}</a>{% else %}{{ row.approval.label }}{% endif %}</td>
+      <td><span class="pill {% if row.approval.status == 'rejected' %}expired{% else %}soon{% endif %}">{{ row.approval.get_status_display }}</span></td>
+      <td class="cell-sub">{{ row.approval.submitted_at|timesince }} ago</td>
+      <td class="cell-sub">{% if row.approval.decided_by %}{{ row.approval.decided_by.username }}: {{ row.approval.note|default:"—" }}{% else %}waiting{% endif %}</td>
+      <td class="actions-cell">
+        {% if row.approval.status == 'rejected' and user.profile.can_edit %}
+        <form method="post" action="{% url 'approvals:resubmit' row.approval.pk %}" style="display:inline;">{% csrf_token %}<button class="btn" type="submit">Send again</button></form>
+        {% endif %}
+      </td>
+    </tr>
+    {% empty %}<tr><td colspan="6" class="dash-empty" style="padding:20px;">Nothing of yours is waiting or rejected.</td></tr>{% endfor %}
+  </table>
+  </div>
+{% endif %}
+{% endblock %}

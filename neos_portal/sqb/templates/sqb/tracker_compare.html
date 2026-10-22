@@ -1,0 +1,119 @@
+{% extends "core/base.html" %}
+{% load sqb_extras %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'sqb:tracker_list' %}">NPT Tracker</a> / Compare units</p>
+
+<div class="page-head">
+  <div>
+    <h1>Compare units</h1>
+    <p class="page-sub">Put two or more units of the same client side by side, on the same basis and against the same KPI.</p>
+  </div>
+</div>
+
+<form method="get" class="npt-filters" id="compare-form">
+  {% include "sqb/_npt_filters.html" %}
+  <div class="npt-filter">
+    <label>Client</label>
+    <select name="client" onchange="document.querySelectorAll('#compare-form input[name=units]').forEach(function (c) { c.checked = false; }); this.form.submit();">
+      <option value="">— choose a client —</option>
+      {% for c in filter_clients %}<option value="{{ c }}" {% if client == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="npt-filter">
+    <label>Show</label>
+    <select name="show">
+      <option value="percent" {% if metric == 'percent' %}selected{% endif %}>NPT % of available hours</option>
+      <option value="hours" {% if metric == 'hours' %}selected{% endif %}>NPT hours</option>
+    </select>
+  </div>
+  <div class="npt-filter">
+    <label>KPI line</label>
+    <select name="kpi">
+      <option value="">Automatic</option>
+      {% for k in kpi_choices %}<option value="{{ k.pk }}" {% if kpi_asked == k.pk|stringformat:"s" %}selected{% endif %}>{{ k.name }} ({{ k.target_text }}){% if k.unit %} &middot; {{ k.unit.name }}{% endif %}</option>{% endfor %}
+      <option value="none" {% if kpi_asked == 'none' %}selected{% endif %}>No line</option>
+    </select>
+  </div>
+  {% if client %}
+  <div class="npt-filter" style="flex:1 1 100%;">
+    <label>Units to compare {% if setting and setting.units.exists %}(the units on {{ client }}'s contract){% else %}(any unit — {{ client }} has none assigned yet){% endif %}</label>
+    <div class="unit-picks">
+      {% for u in unit_choices %}
+      <label class="unit-pick"><input type="checkbox" name="units" value="{{ u.pk }}" {% if u.pk in chosen_ids %}checked{% endif %}> {{ u.name }}{% if u.description %} <span class="cell-sub" style="display:inline;">{{ u.description }}</span>{% endif %}</label>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  <div class="npt-filter npt-filter-buttons">
+    <button class="btn btn-primary" type="submit">Compare</button>
+    <a class="btn" href="{% url 'sqb:npt_compare' %}">Reset</a>
+  </div>
+</form>
+
+{% if not client %}
+<div class="dash-card"><div class="dash-empty">Choose a client to see its units.</div></div>
+{% elif few_units %}
+<div class="dash-card"><div class="dash-empty">Tick <b>two or more units</b> above to compare them.{% if comparison.units %} Showing the one you picked below.{% endif %}</div></div>
+{% endif %}
+
+{% if comparison %}
+<p class="page-sub" style="margin:4px 0 14px;">
+  <span class="dot" style="background:{{ colours|get_key:client }};"></span><strong>{{ client }}</strong> &middot; {{ period.label }}
+  {% if setting %}&middot; worked out on <strong>{{ setting.basis_text }}</strong>{% else %}&middot; <span style="color:var(--warning);">no NPT setup for this client, so only hours can be compared{% if user.profile.can_edit %} (use <b>Client setup</b> on the NPT page){% endif %}</span>{% endif %}
+</p>
+
+<div class="dash-card" style="margin-bottom:14px;">
+  <h3>{% if metric == 'percent' %}NPT % of available hours{% else %}NPT hours{% endif %} <span class="dash-sub" style="display:inline; margin-left:6px;">per {% if comparison.daily %}day{% else %}month{% endif %}</span></h3>
+  <div class="chart">
+    <div class="chart-yaxis">
+      {% for t in chart.ticks %}<span class="y-tick" style="bottom:{{ t.bottom }}%;">{{ t.value|floatformat:"-1" }}{% if metric == 'percent' %}%{% endif %}</span>{% endfor %}
+    </div>
+    <div class="chart-main">
+      <div class="chart-plot compare-plot">
+        {% for t in chart.ticks %}<div class="chart-grid" style="bottom:{{ t.bottom }}%;"></div>{% endfor %}
+        {% if chart.kpi_bottom %}<div class="chart-kpi" style="bottom:{{ chart.kpi_bottom }}%;"><span>KPI {{ chart.kpi_line|floatformat:"-2" }}{% if metric == 'percent' %}%{% else %} h{% endif %}</span></div>{% endif %}
+        {% for g in chart.groups %}
+        <div class="chart-group">
+          {% for b in g.bars %}
+          <div class="chart-col" title="{{ b.unit }}: {{ b.value|floatformat:'-2' }}{% if metric == 'percent' %}%{% else %} h{% endif %}">
+            {% if b.value %}<span class="chart-val">{{ b.value|floatformat:"-1" }}</span>{% endif %}
+            <div class="chart-bar" style="height:{{ b.height }}%; background:{{ b.colour }}; {% if b.over %}box-shadow:0 0 0 2px var(--danger);{% endif %}"></div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+      <div class="chart-axis">
+        {% for g in chart.groups %}<div class="chart-tick">{{ g.label }}{% if g.sub %}<small>{{ g.sub }}</small>{% endif %}</div>{% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="chart-legend">
+    {% for u in comparison.units %}<span><i class="lg" style="background:{{ u.colour }};"></i> {{ u.unit.name }}</span>{% endfor %}
+    {% if chart.kpi_line %}<span><i class="lg lg-line"></i> {{ chart.kpi.name }}: {{ chart.kpi.target_text }} (a red outline = above it)</span>
+    {% else %}<span class="cell-sub">No {% if metric == 'percent' %}% KPI{% else %}hours KPI{% endif %} for {{ client }}, so no target line.</span>{% endif %}
+  </div>
+</div>
+
+<div class="table-wrap">
+<table class="data-table">
+  <tr><th>Unit</th><th>Entries</th><th>NPT</th><th>Available</th><th>NPT %</th><th>Main cause</th>{% if chart.kpi %}<th>vs KPI</th>{% endif %}</tr>
+  {% for u in comparison.units %}
+  <tr>
+    <td class="cell-title"><span class="dot" style="background:{{ u.colour }};"></span>{{ u.unit.name }}<div class="cell-sub">{{ u.unit.description }}</div></td>
+    <td>{{ u.count }}</td>
+    <td><b>{{ u.hours|floatformat:"-1" }}</b> h</td>
+    <td>{% if u.available %}{{ u.available|floatformat:"-1" }} h{% else %}<span class="cell-sub">—</span>{% endif %}</td>
+    <td>{% if u.percent is not None %}<b>{{ u.percent|floatformat:"-1" }}%</b>{% else %}<span class="cell-sub">—</span>{% endif %}</td>
+    <td>{{ u.top_cause|default:"—" }}</td>
+    {% if chart.kpi %}<td>
+      {% if chart.kpi.metric == 'percent' and u.percent is not None %}<span class="pill {% if u.percent > chart.kpi.target %}expired{% else %}valid{% endif %}">{% if u.percent > chart.kpi.target %}Above{% else %}Below{% endif %} KPI</span>
+      {% elif chart.kpi.metric == 'hours' %}<span class="pill {% if u.hours > chart.kpi.target %}expired{% else %}valid{% endif %}">{% if u.hours > chart.kpi.target %}Above{% else %}Below{% endif %} KPI</span>
+      {% else %}<span class="cell-sub">—</span>{% endif %}
+    </td>{% endif %}
+  </tr>
+  {% endfor %}
+</table>
+</div>
+{% endif %}
+{% endblock %}

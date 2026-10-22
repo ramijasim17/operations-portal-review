@@ -1,0 +1,111 @@
+{% extends "core/base.html" %}
+{% block content %}
+<style>
+  .sgs-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(220px, 420px));
+    gap: 4px 24px;
+    max-width: 900px;
+  }
+  .sgs-form-grid .full-width { grid-column: 1 / -1; }
+  .sgs-form-grid p { margin: 6px 0; }
+  .sgs-form-grid input[type="text"], .sgs-form-grid input[type="number"],
+  .sgs-form-grid input[type="date"], .sgs-form-grid input[type="datetime-local"],
+  .sgs-form-grid select, .sgs-form-grid textarea {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .sgs-section {
+    border: 1px solid var(--border, #333);
+    border-radius: 8px;
+    padding: 14px 20px 4px;
+    margin-bottom: 20px;
+  }
+  .sgs-section legend {
+    padding: 0 8px;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-secondary, #999);
+  }
+</style>
+<h1>{% if report %}Edit{% else %}New{% endif %} SGS report</h1>
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+
+  <fieldset class="sgs-section">
+    <legend>Report basics</legend>
+    <div class="sgs-form-grid">
+      <p class="full-width">{{ form.report_type.label_tag }} {{ form.report_type }}</p>
+      <p class="full-width">{{ form.status.label_tag }} {{ form.status }}</p>
+      <p>{{ form.client.label_tag }} {{ form.client }}</p>
+      <p>{{ form.client_logo.label_tag }} {{ form.client_logo }}</p>
+      <p>{{ form.temp_unit.label_tag }} {{ form.temp_unit }}</p>
+      <p>{{ form.time_display.label_tag }} {{ form.time_display }}</p>
+    </div>
+  </fieldset>
+
+  <fieldset class="sgs-section">
+    <legend>Run timing (drives battery-hour tracking)</legend>
+    <div class="sgs-form-grid">
+      <p>{{ form.run_start.label_tag }} {{ form.run_start }}</p>
+      <p>{{ form.run_end.label_tag }} {{ form.run_end }}</p>
+      <p>{{ form.bottom_gauge_connected_at.label_tag }} {{ form.bottom_gauge_connected_at }}</p>
+      <p>{{ form.bottom_gauge_disconnected_at.label_tag }} {{ form.bottom_gauge_disconnected_at }}</p>
+      <p>{{ form.top_gauge_connected_at.label_tag }} {{ form.top_gauge_connected_at }}</p>
+      <p>{{ form.top_gauge_disconnected_at.label_tag }} {{ form.top_gauge_disconnected_at }}</p>
+    </div>
+  </fieldset>
+
+  <fieldset class="sgs-section">
+    <legend>General information</legend>
+    <div class="sgs-form-grid">
+      <p>{{ form.well_name.label_tag }} {{ form.well_name }}</p>
+      <p>{{ form.field.label_tag }} {{ form.field }}</p>
+      <p>{{ form.company.label_tag }} {{ form.company }}</p>
+      <p>{{ form.sor_number.label_tag }} {{ form.sor_number }}</p>
+      <p>{{ form.dgs_cps.label_tag }} {{ form.dgs_cps }}</p>
+      <p>{{ form.test_type.label_tag }} {{ form.test_type }}</p>
+      <p>{{ form.rig.label_tag }} {{ form.rig }}</p>
+      <p>{{ form.country_city.label_tag }} {{ form.country_city }}</p>
+      <p>{{ form.depth_reference.label_tag }} {{ form.depth_reference }}</p>
+      <p>{{ form.unit_system.label_tag }} {{ form.unit_system }}</p>
+      <p>{{ form.time_rih.label_tag }} {{ form.time_rih }}<br><span class="page-sub">Only used if Run start (above) isn't set yet — normally derived automatically.</span></p>
+    </div>
+  </fieldset>
+
+  <fieldset class="sgs-section">
+    <legend>Operation details</legend>
+    <p class="page-sub" style="margin-top:0;">Date of test is set automatically from Run start above — no need to enter it separately.</p>
+    <div class="sgs-form-grid">
+      <p>{{ form.company_representative.label_tag }} {{ form.company_representative }}</p>
+      <p>{{ form.neos_representative.label_tag }} {{ form.neos_representative }}</p>
+    </div>
+  </fieldset>
+
+  <fieldset class="sgs-section">
+    <legend>Well data</legend>
+    <div class="sgs-form-grid">
+      <p>{{ form.well_state_before_test.label_tag }} {{ form.well_state_before_test }}</p>
+      <p>{{ form.well_type.label_tag }} {{ form.well_type }}</p>
+      <p>{{ form.fluid_type.label_tag }} {{ form.fluid_type }}</p>
+      <p>{{ form.completion_type.label_tag }} {{ form.completion_type }}</p>
+      <p>{{ form.well_status.label_tag }} {{ form.well_status }}</p>
+      <p>{{ form.min_restriction.label_tag }} {{ form.min_restriction }}</p>
+      <p>{{ form.casing_size.label_tag }} {{ form.casing_size }}</p>
+      <p>{{ form.tubing_size.label_tag }} {{ form.tubing_size }}</p>
+      <p class="full-width">{{ form.test_interval.label_tag }} {{ form.test_interval }}</p>
+    </div>
+  </fieldset>
+
+  <fieldset class="sgs-section">
+    <legend>Gauge selection (from Gauge Library)</legend>
+    <div class="sgs-form-grid">
+      <p>{{ form.bottom_gauge.label_tag }} {{ form.bottom_gauge }}</p>
+      <p>{{ form.top_gauge.label_tag }} {{ form.top_gauge }}</p>
+    </div>
+  </fieldset>
+
+  <button class="btn btn-primary" type="submit">Save</button>
+  <a class="btn" href="{% url 'sgs_report:list' %}">Cancel</a>
+</form>
+{% endblock %}

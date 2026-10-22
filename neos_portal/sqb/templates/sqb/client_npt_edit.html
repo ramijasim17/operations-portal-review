@@ -1,0 +1,40 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>NPT setup &mdash; {{ client.name }}</h1>
+<div class="basis-help">
+  <div><b>Monthly &mdash; 24 h</b><span>24 h &times; days &times; the client's units</span></div>
+  <div><b>Monthly &mdash; 12 h</b><span>12 h &times; days &times; the client's units</span></div>
+  <div><b>Call-out</b><span>12 h or 24 h &times; the days of each call-out job (set the dates on the job report)</span></div>
+</div>
+<form method="post" id="client-npt-form" class="client-npt-form">
+  {% csrf_token %}
+  <div class="cnpt-row">
+    <div class="cnpt-field">{{ form.basis.label_tag }} {{ form.basis }}{{ form.basis.errors }}</div>
+    <div class="cnpt-field" id="callout-row">{{ form.callout_hours.label_tag }} {{ form.callout_hours }}<span class="helptext">{{ form.callout_hours.help_text }}</span>{{ form.callout_hours.errors }}</div>
+  </div>
+  <div class="cnpt-field" id="units-row">
+    {{ form.units.label_tag }}
+    {{ form.units }}
+    {{ form.units.errors }}
+    <span class="helptext">Each unit has the full hours available every day. Tick the units that work for {{ client.name }}.</span>
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">Save</button>
+    <a class="btn" href="{% url 'sqb:client_npt_manage' %}">Cancel</a>
+  </div>
+</form>
+<script>
+(function () {
+  var form = document.getElementById("client-npt-form");
+  if (!form) return;
+  var basis = form.querySelector("[name=basis]");
+  function update() {
+    var callout = basis.value === "callout";
+    document.getElementById("callout-row").style.display = callout ? "" : "none";
+    document.getElementById("units-row").style.display = callout ? "none" : "";
+  }
+  basis.addEventListener("change", update);
+  update();
+})();
+</script>
+{% endblock %}

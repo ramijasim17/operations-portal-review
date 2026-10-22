@@ -1,0 +1,12 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'sgs_report:gauge_list' %}">Gauge Library</a> / Edit {{ gauge.serial_number }}</p>
+<h1>Edit gauge {{ gauge.serial_number }}</h1>
+<p class="page-sub">Changing the battery here records that a new battery has been paired with this gauge &mdash; its hour tracking starts fresh from this point.</p>
+<form method="post" enctype="multipart/form-data" style="max-width:420px;">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Save</button>
+  <a class="btn" href="{% url 'sgs_report:gauge_list' %}">Cancel</a>
+</form>
+{% endblock %}

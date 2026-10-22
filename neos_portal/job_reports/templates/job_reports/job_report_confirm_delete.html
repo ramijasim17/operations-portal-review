@@ -1,0 +1,10 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Delete "{{ report.name }}"?</h1>
+<p class="page-sub">Uploaded documents on this job report will also be deleted. The manifest itself is unaffected.</p>
+<form method="post">
+  {% csrf_token %}
+  <button class="btn btn-primary" type="submit">Delete</button>
+  <a class="btn" href="{% url 'job_reports:list' %}">Cancel</a>
+</form>
+{% endblock %}

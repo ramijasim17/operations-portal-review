@@ -1,0 +1,105 @@
+{% extends "core/base.html" %}
+{% block title %}QHSE · ABC Operations Portal{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>QHSE</h1>
+    <p class="page-sub">Follow up what is overdue or has failed in Maintenance and the Action Tracker, and find out why.{% if scope.mode != 'all' %} <strong>Showing {{ scope.label }} only.</strong>{% endif %}</p>
+  </div>
+  <div class="page-head-actions">
+    {% if user.profile.can_edit %}
+      <a data-modal class="btn" href="{% url 'qhse:visit_create' %}">+ Site visit</a>
+      <a data-modal class="btn" href="{% url 'qhse:inspection_create' %}">+ Schedule audit</a>
+      <a data-modal class="btn btn-primary" href="{% url 'qhse:investigation_create' %}">+ Investigation</a>
+    {% endif %}
+  </div>
+</div>
+{% include "qhse/_tabs.html" %}
+
+<div class="stat-strip">
+  <div class="stat {% if stats.failed %}stat-bad{% else %}stat-good{% endif %}"><div class="stat-value">{{ stats.failed }}</div><div class="stat-label">failed tests / failures</div></div>
+  <div class="stat {% if stats.overdue_jobs %}stat-bad{% else %}stat-good{% endif %}"><div class="stat-value">{{ stats.overdue_jobs }}</div><div class="stat-label">overdue maintenance</div></div>
+  <div class="stat {% if stats.overdue_actions %}stat-bad{% else %}stat-good{% endif %}"><div class="stat-value">{{ stats.overdue_actions }}</div><div class="stat-label">overdue actions</div></div>
+  <div class="stat {% if stats.open_investigations %}stat-warn{% else %}stat-muted{% endif %}"><div class="stat-value">{{ stats.open_investigations }}</div><div class="stat-label">open investigations</div></div>
+</div>
+<p class="cell-sub" style="margin:-4px 0 14px;">
+  {% if stats.overdue_inspections %}<a href="{% url 'qhse:inspection_list' %}?tab=overdue">{{ stats.overdue_inspections }} overdue audit{{ stats.overdue_inspections|pluralize }} / inspection{{ stats.overdue_inspections|pluralize }}</a> &middot; {% endif %}
+  <a href="{% url 'qhse:incident_list' %}">{{ stats.open_incidents }} open incident{{ stats.open_incidents|pluralize }}{% if stats.serious_open %} ({{ stats.serious_open }} serious){% endif %}</a>
+  {% if stats.days_since is not None %}&middot; {{ stats.days_since }} day{{ stats.days_since|pluralize }} since the last incident / injury{% endif %}
+</p>
+
+<div class="dash-card" style="margin-bottom:14px;">
+  <h3>Failed tests and failures <span class="dash-count">{{ failed|length }}</span> <span class="dash-sub" style="display:inline; margin-left:6px;">from Maintenance</span></h3>
+  {% for r in failed %}
+  <div style="display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--border); flex-wrap:wrap;">
+    <div class="cell-title"><a href="{% url 'maintenance:history' r.pk %}">{{ r.asset_serial }}</a> &middot; {{ r.get_activity_display }}
+      <div class="cell-sub">{{ r.asset_description }}{% if r.last_result == 'Fail' %} &middot; last result Fail{% else %} &middot; failure reported{% endif %}{% if r.last_done %} &middot; {{ r.last_done|date:"j M Y" }}{% endif %}</div></div>
+    <div style="display:flex; gap:6px; align-items:flex-start;">
+      {% if r.inv %}<a class="btn" href="{% url 'qhse:investigation_detail' r.inv.pk %}">{{ r.inv.reference }} &middot; {{ r.inv.status }}</a>
+      {% elif user.profile.can_edit %}<a data-modal class="btn btn-primary" href="{% url 'qhse:investigation_create' %}?maintenance={{ r.pk }}&trigger={% if r.last_result == 'Fail' %}failed_test{% else %}failure{% endif %}">Investigate</a>{% endif %}
+    </div>
+  </div>
+  {% empty %}<div class="dash-empty">Nothing has failed. Good.</div>{% endfor %}
+</div>
+
+<div class="dash-row dash-row-2">
+  <div class="dash-card">
+    <h3>Overdue maintenance <span class="dash-count">{{ overdue_jobs|length }}</span></h3>
+    {% for r in overdue_jobs %}
+    <div style="display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--border); flex-wrap:wrap;">
+      <div class="cell-title"><a href="{% url 'maintenance:history' r.pk %}">{{ r.asset_serial }}</a> &middot; {{ r.get_activity_display }}
+        <div class="cell-sub">{{ r.asset_description }} &middot; due {{ r.due_date|date:"j M" }} <span class="pill expired">{{ r.days_left|cut:"-" }} d overdue</span></div></div>
+      {% if r.inv %}<a class="btn" href="{% url 'qhse:investigation_detail' r.inv.pk %}">{{ r.inv.reference }}</a>
+      {% elif user.profile.can_edit %}<a data-modal class="btn" href="{% url 'qhse:investigation_create' %}?maintenance={{ r.pk }}&trigger=overdue_job">Investigate</a>{% endif %}
+    </div>
+    {% empty %}<div class="dash-empty">No overdue maintenance.</div>{% endfor %}
+  </div>
+  <div class="dash-card">
+    <h3>Overdue actions <span class="dash-count">{{ overdue_actions|length }}</span> <span class="dash-sub" style="display:inline; margin-left:6px;">from the Action Tracker</span></h3>
+    {% for a in overdue_actions %}
+    <div style="display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--border); flex-wrap:wrap;">
+      <div class="cell-title"><a href="{% url 'action_tracker:detail' a.pk %}">{{ a.action_item|truncatechars:70 }}</a>
+        <div class="cell-sub">{{ a.assignee|default:"unassigned" }} &middot; due {{ a.due_date|date:"j M" }} <span class="pill expired">{{ a.days_left|cut:"-" }} d overdue</span></div></div>
+      {% if a.inv %}<a class="btn" href="{% url 'qhse:investigation_detail' a.inv.pk %}">{{ a.inv.reference }}</a>
+      {% elif user.profile.can_edit %}<a data-modal class="btn" href="{% url 'qhse:investigation_create' %}?action={{ a.pk }}">Investigate</a>{% endif %}
+    </div>
+    {% empty %}<div class="dash-empty">No overdue actions.</div>{% endfor %}
+  </div>
+</div>
+
+<div class="dash-card" style="margin-bottom:14px;">
+  <h3>Non-productive time (NPT) <span class="dash-count">{{ npt_entries|length }}</span> <span class="dash-sub" style="display:inline; margin-left:6px;">last 60 days, biggest first &middot; {{ stats.npt_month|floatformat:"-1" }} h this month</span>
+    <a class="cell-sub" style="margin-left:8px;" href="{% url 'sqb:tracker_list' %}">NPT tracker</a></h3>
+  {% for e in npt_entries %}
+  <div style="display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--border); flex-wrap:wrap;">
+    <div class="cell-title"><b>{{ e.npt_hours|floatformat:"-1" }} h</b> &middot; {% if e.unit %}{{ e.unit.name }}{% else %}no unit{% endif %}
+      <div class="cell-sub">{{ e.date|date:"j M" }}{% if e.category %} &middot; {{ e.get_category_display }}{% endif %}{% if e.job_report %} &middot; {{ e.job_report.name }}{% endif %}{% if e.client %} &middot; {{ e.client }}{% endif %}{% if e.description %} &middot; {{ e.description|truncatechars:60 }}{% endif %}</div></div>
+    {% if e.inv %}<a class="btn" href="{% url 'qhse:investigation_detail' e.inv.pk %}">{{ e.inv.reference }} &middot; {{ e.inv.status }}</a>
+    {% elif user.profile.can_edit %}<a data-modal class="btn" href="{% url 'qhse:investigation_create' %}?npt={{ e.pk }}">Investigate</a>{% endif %}
+  </div>
+  {% empty %}<div class="dash-empty">No NPT recorded in the last 60 days.</div>{% endfor %}
+</div>
+
+<div class="dash-row dash-row-2">
+  <div class="dash-card">
+    <h3>Open investigations <a class="cell-sub" style="margin-left:8px;" href="{% url 'qhse:investigation_list' %}">all</a></h3>
+    {% for i in investigations %}
+    <div style="display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--border);">
+      <div class="cell-title"><a href="{% url 'qhse:investigation_detail' i.pk %}">{{ i.reference }} &middot; {{ i.title }}</a>
+        <div class="cell-sub">{{ i.get_trigger_display }} &middot; {{ i.owner|default:"no owner" }}{% if i.due_date %} &middot; finish by {{ i.due_date|date:"j M" }}{% endif %}</div></div>
+      <span class="pill {% if i.is_overdue %}expired{% elif i.status == 'Investigating' %}soon{% endif %}" style="align-self:flex-start;">{% if i.is_overdue %}Late{% else %}{{ i.status }}{% endif %}</span>
+    </div>
+    {% empty %}<div class="dash-empty">No open investigations.</div>{% endfor %}
+  </div>
+  <div class="dash-card">
+    <h3>Overdue audits and inspections <a class="cell-sub" style="margin-left:8px;" href="{% url 'qhse:inspection_list' %}">all</a></h3>
+    {% for i in overdue_inspections %}
+    <div style="display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--border);">
+      <div class="cell-title"><a href="{% url 'qhse:inspection_detail' i.pk %}">{{ i.title }}</a>
+        <div class="cell-sub">{{ i.get_kind_display }} &middot; {{ i.get_scope_display }}{% if i.area %} &middot; {{ i.area }}{% endif %} &middot; due {{ i.due_date|date:"j M" }}</div></div>
+      <span class="pill expired" style="align-self:flex-start;">{{ i.status_text }}</span>
+    </div>
+    {% empty %}<div class="dash-empty">Nothing overdue.</div>{% endfor %}
+  </div>
+</div>
+{% endblock %}

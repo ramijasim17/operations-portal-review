@@ -1,0 +1,16 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Cert types — {{ classification.name }}</h1>
+<form method="post">
+  {% csrf_token %}
+  {% for ct in all_cert_types %}
+    <label style="display:block; margin-bottom: 6px;">
+      <input type="checkbox" name="cert_types" value="{{ ct.id }}" {% if ct.id in assigned_ids %}checked{% endif %}>
+      {{ ct.name }}
+    </label>
+  {% empty %}
+    <p>No cert types exist yet. <a data-modal href="{% url 'departments:cert_type_manage' %}">Create one first</a>.</p>
+  {% endfor %}
+  <button class="btn btn-primary" type="submit">Save</button>
+</form>
+{% endblock %}

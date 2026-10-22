@@ -1,0 +1,30 @@
+{% if approval and approval.status == "pending" %}
+<div class="approval-banner is-pending">
+  <div><b>Waiting for approval</b> &middot; {{ kind.label }}. Sent by {{ approval.submitted_by.username|default:"someone" }} {{ approval.submitted_at|timesince }} ago. <span class="cell-sub">{{ kind.hint }}</span></div>
+  {% if can_decide %}
+  <form method="post" action="{% url 'approvals:decide' approval.pk %}" class="decide-row" data-confirm="Save this decision?">{% csrf_token %}
+    <input type="text" name="note" placeholder="Reason (needed to reject)">
+    <button class="btn btn-primary" type="submit" name="decision" value="approve">Approve</button>
+    <button class="btn" type="submit" name="decision" value="reject">Reject</button>
+  </form>
+  {% endif %}
+</div>
+{% elif approval and approval.status == "rejected" %}
+<div class="approval-banner is-rejected">
+  <div><b>Rejected</b> by {{ approval.decided_by.username|default:"a Level 3" }}{% if approval.note %}: {{ approval.note }}{% endif %}</div>
+  {% if can_edit %}
+  <form method="post" action="{% url 'approvals:resubmit' approval.pk %}" data-noconfirm>{% csrf_token %}<button class="btn" type="submit">Send again</button></form>
+  {% endif %}
+</div>
+{% elif approval and show_ok %}
+<div class="approval-banner is-ok">
+  <div><b>Approved</b>{% if approval.auto %} (made by a Level 3){% else %} by {{ approval.decided_by.username|default:"a Level 3" }}{% endif %}{% if approval.decided_at %} on {{ approval.decided_at|date:"d M Y" }}{% endif %}.</div>
+</div>
+{% elif not approval and offer_submit and can_edit %}
+<div class="approval-banner">
+  <div><b>Not approved yet</b> &middot; {{ kind.label }}. <span class="cell-sub">{{ kind.hint }}</span></div>
+  <form method="post" action="{% url 'approvals:submit_sgs' obj.pk kind_key %}" data-confirm="{% if can_decide %}Approve this now?{% else %}Send this to a Level 3 for approval?{% endif %}">{% csrf_token %}
+    <button class="btn btn-primary" type="submit">{% if can_decide %}Approve{% else %}Send for approval{% endif %}</button>
+  </form>
+</div>
+{% endif %}

@@ -1,0 +1,42 @@
+{% extends "core/base.html" %}
+{% block title %}Incidents · QHSE{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Incidents</h1><p class="page-sub">Incidents, near misses, unsafe conditions, spills and quality issues &mdash; the most serious open ones first.</p></div>
+  <div class="page-head-actions">{% if user.profile.can_edit %}<a data-modal class="btn btn-primary" href="{% url 'qhse:incident_create' %}">+ Report incident</a>{% endif %}</div>
+</div>
+{% include "qhse/_tabs.html" %}
+<div class="tabs-row">
+  <a href="?tab=open" class="tab-box {% if tab == 'open' %}active{% endif %}">Open <span class="tab-count">{{ counts.open }}</span></a>
+  <a href="?tab=closed" class="tab-box {% if tab == 'closed' %}active{% endif %}">Closed <span class="tab-count">{{ counts.closed }}</span></a>
+  <a href="?tab=all" class="tab-box {% if tab == 'all' %}active{% endif %}">All <span class="tab-count">{{ counts.all }}</span></a>
+</div>
+<form method="get" class="toolbar">
+  <input type="hidden" name="tab" value="{{ tab }}">
+  <input type="search" name="q" placeholder="Search reference, title, location, client…" value="{{ q }}">
+  <select name="severity" onchange="this.form.submit()"><option value="">All severities</option>{% for v, l in severity_choices %}<option value="{{ v }}" {% if severity == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+  <select name="type" onchange="this.form.submit()"><option value="">All types</option>{% for v, l in type_choices %}<option value="{{ v }}" {% if kind == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+  <button class="btn" type="submit">Search</button>
+  {% if q or severity or kind %}<a class="btn" href="?tab={{ tab }}">Clear</a>{% endif %}
+</form>
+<div class="table-wrap">
+<table class="data-table">
+  <thead><tr><th>Ref</th><th>Incident</th><th>Severity</th><th>Date</th><th>Actions</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for i in incidents %}
+  <tr {% if not i.is_open %}style="opacity:.7;"{% endif %}>
+    <td style="white-space:nowrap;">{{ i.reference }}</td>
+    <td><div class="cell-title"><a href="{% url 'qhse:incident_detail' i.pk %}">{{ i.title }}</a></div>
+      <div class="cell-sub">{{ i.get_incident_type_display }}{% if scope.mode == 'all' and i.department %} &middot; {{ i.department.name }}{% endif %}{% if i.asset_serial %} &middot; {{ i.asset_serial }}{% endif %}{% if i.location %} &middot; {{ i.location }}{% endif %}{% if i.client %} &middot; {{ i.client }}{% endif %}{% if i.assigned_to %} &middot; {{ i.assigned_to }}{% endif %}</div></td>
+    <td><span class="pill {{ i.severity_pill }}">{{ i.severity }}</span></td>
+    <td style="white-space:nowrap;">{{ i.date|date:"d M Y" }}</td>
+    <td>{% with n=i.actions.all|length %}{% if n %}{{ n }}{% else %}—{% endif %}{% endwith %}</td>
+    <td><span class="pill {% if i.status == 'Closed' %}valid{% elif i.status == 'Investigating' %}soon{% endif %}">{{ i.status }}</span></td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="6" class="dash-empty" style="padding:20px;">No incidents here.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

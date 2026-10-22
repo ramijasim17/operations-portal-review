@@ -1,0 +1,16 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'personnel:list' %}">Personnel</a> / Import from CSV</p>
+<h1>Import personnel & certificates from CSV</h1>
+<p class="page-sub">
+  Expected columns: Name, ID, Dept, Position, Status, then one column per training course
+  (header = course name). Each cell under a course column should be a date (YYYY-MM-DD),
+  "Missing" (needed but not held), or "N/A" (not required for this role).
+</p>
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <input type="file" name="file" accept=".csv" required>
+  <button class="btn btn-primary" type="submit">Import</button>
+</form>
+{% endblock %}

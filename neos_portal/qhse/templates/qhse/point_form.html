@@ -1,0 +1,11 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>{% if point %}Edit point{% else %}Add a point to check{% endif %}</h1>
+<p class="page-sub">In part <strong>{{ part.title }}</strong> of {{ part.template.name }}.</p>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Save</button>
+  <a class="btn" href="{% url 'qhse:template_detail' part.template_id %}">Cancel</a>
+</form>
+{% endblock %}

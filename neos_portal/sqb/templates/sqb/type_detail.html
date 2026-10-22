@@ -1,0 +1,23 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'sqb:job_list' %}">SQB</a> / <a data-modal href="{% url 'sqb:type_manage' %}">Types</a> / {{ sqb_type.name }}</p>
+<h1>{{ sqb_type.name }} — required parts</h1>
+<table class="data-table">
+  <tr><th>Part</th><th>Order</th><th></th></tr>
+  {% for p in parts %}
+  <tr>
+    <td>{{ p.name }}</td>
+    <td>{{ p.order }}</td>
+    <td>{% if user.profile.can_delete %}<form method="post" action="{% url 'sqb:part_definition_delete' p.pk %}" style="display:inline;">{% csrf_token %}<button class="btn" type="submit" data-confirm="Delete this part?">Delete</button></form>{% endif %}</td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="3">No parts yet — add some below (e.g. JSA, Risk Assessment, Chart, Lifting Plan).</td></tr>
+  {% endfor %}
+</table>
+<h2>New part</h2>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Add part</button>
+</form>
+{% endblock %}

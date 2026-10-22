@@ -1,0 +1,60 @@
+{% extends "core/base.html" %}
+{% block title %}{{ inv.reference }} · QHSE{% endblock %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'qhse:investigation_list' %}">QHSE investigations</a> / {{ inv.reference }}</p>
+<div class="page-head">
+  <div>
+    <h1>{{ inv.title }}</h1>
+    <p class="page-sub">
+      <span class="pill">{{ inv.get_trigger_display }}</span>
+      {% if inv.department %}<span class="pill">{{ inv.department.name }}</span>{% endif %}
+      <span class="pill {% if inv.status == 'Closed' %}valid{% elif inv.status == 'Investigating' %}soon{% endif %}">{{ inv.status }}</span>
+      {% if inv.is_overdue %}<span class="pill expired">late</span>{% endif %}
+      &nbsp;{% if inv.asset_serial %}{{ inv.asset_serial }} &middot; {% endif %}{{ inv.owner|default:"no owner" }}
+      <br><span class="cell-sub">{{ inv.reference }} &middot; opened {{ inv.opened_date|date:"j M Y" }}{% if inv.due_date %} &middot; finish by {{ inv.due_date|date:"j M Y" }}{% endif %} &middot; {% if inv.is_open %}open for {{ inv.age_days }} day{{ inv.age_days|pluralize }}{% else %}closed {{ inv.closed_date|date:"j M Y" }} after {{ inv.age_days }} day{{ inv.age_days|pluralize }}{% endif %}</span>
+    </p>
+  </div>
+  <div class="page-head-actions">
+    {% if user.profile.can_edit %}
+      <a data-modal class="btn" href="{% url 'qhse:investigation_edit' inv.pk %}">Edit</a>
+      {% if inv.status == 'Open' %}<form method="post" action="{% url 'qhse:investigation_status' inv.pk %}" data-noconfirm>{% csrf_token %}<input type="hidden" name="status" value="Investigating"><button class="btn" type="submit">Start</button></form>{% endif %}
+      {% if inv.is_open %}<form method="post" action="{% url 'qhse:investigation_status' inv.pk %}" data-noconfirm>{% csrf_token %}<input type="hidden" name="status" value="Closed"><button class="btn btn-primary" type="submit">Close</button></form>
+      {% else %}<form method="post" action="{% url 'qhse:investigation_status' inv.pk %}" data-noconfirm>{% csrf_token %}<input type="hidden" name="status" value="Open"><button class="btn" type="submit">Reopen</button></form>{% endif %}
+    {% endif %}
+    {% if user.profile.can_delete %}<form method="post" action="{% url 'qhse:investigation_delete' inv.pk %}">{% csrf_token %}<button class="btn" type="submit" data-confirm="Delete this investigation?">Delete</button></form>{% endif %}
+  </div>
+</div>
+
+<div class="dash-card" style="margin-bottom:14px;">
+  <h3>Where it came from</h3>
+  {% if inv.maintenance_record %}<p style="margin:0 0 4px;">Maintenance job: <a href="{% url 'maintenance:history' inv.maintenance_record.pk %}">{{ inv.maintenance_record.asset_serial }} &middot; {{ inv.maintenance_record.get_activity_display }}</a></p>{% endif %}
+  {% if inv.action %}<p style="margin:0 0 4px;">Action: <a href="{% url 'action_tracker:detail' inv.action.pk %}">{{ inv.action.action_item }}</a> <span class="pill {% if inv.action.is_overdue %}expired{% elif not inv.action.is_open %}valid{% endif %}">{{ inv.action.status }}</span></p>{% endif %}
+  {% if inv.npt_entry %}<p style="margin:0 0 4px;">NPT entry: <a href="{% url 'sqb:tracker_list' %}">{{ inv.npt_entry.npt_hours|floatformat:"-1" }} h{% if inv.npt_entry.unit %} on {{ inv.npt_entry.unit.name }}{% endif %}, {{ inv.npt_entry.date|date:"j M Y" }}</a></p>{% endif %}
+  {% if inv.incident %}<p style="margin:0 0 4px;">Incident: <a href="{% url 'qhse:incident_detail' inv.incident.pk %}">{{ inv.incident.reference }} &middot; {{ inv.incident.title }}</a></p>{% endif %}
+  {% if not inv.maintenance_record and not inv.action and not inv.incident and not inv.npt_entry %}<p class="cell-sub" style="margin:0;">Opened by hand.</p>{% endif %}
+  {% if inv.asset_serial %}{% if inv.maintenance_record.asset %}<p style="margin:6px 0 0;"><a href="{% url 'departments:asset_detail' inv.maintenance_record.asset.pk %}">Open the equipment overview for {{ inv.asset_serial }}</a></p>{% endif %}{% endif %}
+</div>
+
+<div class="dash-row dash-row-2">
+  <div class="dash-card">
+    <h3>What happened</h3><p style="margin:0;">{{ inv.what_happened|default:"Not written yet."|linebreaksbr }}</p>
+    <h4 style="margin:14px 0 4px;">Findings</h4><p style="margin:0;">{{ inv.findings|default:"Not written yet."|linebreaksbr }}</p>
+  </div>
+  <div class="dash-card">
+    <h3>Root cause</h3><p style="margin:0;">{{ inv.root_cause|default:"Not found yet."|linebreaksbr }}</p>
+  </div>
+</div>
+
+<div class="dash-card">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+    <h3 style="margin:0;">Corrective actions <span class="dash-count">{{ linked|length }}</span></h3>
+    {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'qhse:investigation_action' inv.pk %}">+ Raise corrective action</a>{% endif %}
+  </div>
+  {% for a in linked %}
+  <div style="display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--border); margin-top:8px;">
+    <div class="cell-title"><a href="{% url 'action_tracker:detail' a.pk %}">{{ a.action_item }}</a><div class="cell-sub">{{ a.assignee|default:"unassigned" }}{% if a.due_date %} &middot; due {{ a.due_date|date:"j M Y" }}{% endif %}</div></div>
+    <span class="pill {% if not a.is_open %}valid{% elif a.is_overdue %}expired{% elif a.status == 'In Progress' %}soon{% endif %}" style="align-self:flex-start;">{% if a.is_overdue %}Overdue{% else %}{{ a.status }}{% endif %}</span>
+  </div>
+  {% empty %}<p class="dash-empty" style="margin-top:10px;">No corrective actions yet. Raise one for what must change so this does not happen again.</p>{% endfor %}
+</div>
+{% endblock %}

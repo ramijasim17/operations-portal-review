@@ -1,0 +1,16 @@
+{% if scope.locked %}
+  {% if blocked %}
+  <div class="alert alert-error" style="margin:0 0 14px;">Your account is not linked to a department yet, so there is nothing to show here. Ask an admin to put your department on your Personnel record.</div>
+  {% else %}
+  <p class="dept-badge" title="You see your own department's records here."><span>Department</span> <strong>{{ scope.label }}</strong></p>
+  {% endif %}
+{% else %}
+<form method="get" action="{{ path }}" class="qhse-scope" title="Showing one department at a time. Applies to Action Tracker, QHSE, Maintenance and Personnel.">
+  <label for="dept-select">Department</label>
+  <select id="dept-select" name="dept" onchange="this.form.submit()">
+    <option value="all" {% if scope.mode == 'all' %}selected{% endif %}>All departments</option>
+    {% for d in departments %}<option value="{{ d.pk }}" {% if scope.mode == 'dept' and scope.department.pk == d.pk %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
+    <option value="none" {% if scope.mode == 'none' %}selected{% endif %}>No department</option>
+  </select>
+</form>
+{% endif %}

@@ -1,0 +1,10 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>{% if person %}Edit{% else %}New{% endif %} personnel record</h1>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Save</button>
+  <a class="btn" href="{% url 'personnel:list' %}">Cancel</a>
+</form>
+{% endblock %}

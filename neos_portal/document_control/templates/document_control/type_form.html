@@ -1,0 +1,11 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub"><a data-modal href="{% url 'document_control:type_manage' %}">Document Types</a> / Edit {{ doc_type.name }}</p>
+<h1>Edit document type</h1>
+<form method="post" style="max-width:420px;">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Save</button>
+  <a data-modal class="btn" href="{% url 'document_control:type_manage' %}">Cancel</a>
+</form>
+{% endblock %}

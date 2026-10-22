@@ -1,0 +1,15 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Amend battery use</h1>
+<p class="page-sub">{{ usage.report.well_name }} &middot; battery {{ usage.battery.serial_number }} &middot; ran {{ usage.hours|floatformat:2 }} h.
+The portal's figure is hours &times; {{ draw|floatformat:"-2" }} mA = <b>{{ calculated|floatformat:1 }} mAh</b>. Type the real amount if you know it
+(for example from your battery sheet).</p>
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ next }}">
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Save</button>
+  {% if usage.manual %}<button class="btn" type="submit" name="reset" value="1" data-confirm="Go back to the calculated {{ calculated|floatformat:1 }} mAh?">Back to calculated</button>{% endif %}
+  <a class="btn" href="{{ next }}">Cancel</a>
+</form>
+{% endblock %}

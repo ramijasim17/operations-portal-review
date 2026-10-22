@@ -1,0 +1,73 @@
+{% extends "core/base.html" %}
+{% load personnel_extras approval_tags %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'personnel:list' %}">Personnel</a> / {{ person.name }}</p>
+
+<div class="page-head">
+  <div class="person-header">
+    <span class="avatar avatar-lg" style="background:{{ person.name|avatar_colour }};">{{ person.name|initials }}</span>
+    <div>
+    <h1>{{ person.name }}</h1>
+    <p class="page-sub">
+      ID {{ person.employee_id }}{% if person.position %} &middot; {{ person.position }}{% endif %}{% if person.department %} &middot; {{ person.department }}{% endif %}
+      &middot; <span class="pill {% if person.status == 'Active' %}valid{% endif %}">{{ person.status }}</span>
+    </p>
+    </div>
+  </div>
+  <div class="page-head-actions">
+    {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'personnel:edit' person.pk %}">Edit</a>{% endif %}
+  </div>
+</div>
+
+{% approval_panel person "personnel" show_ok=True %}
+{% approval_panel person "personnel_removal" %}
+
+<div class="stat-strip">
+  <div class="stat"><div class="stat-value">{{ jobs|length }}</div><div class="stat-label">jobs supervised</div></div>
+  <div class="stat {% if current_count %}stat-warn{% else %}stat-muted{% endif %}"><div class="stat-value">{{ current_count }}</div><div class="stat-label">on a job now</div></div>
+  <div class="stat"><div class="stat-value">{{ total_days }}</div><div class="stat-label">days on jobs</div></div>
+  <div class="stat stat-muted"><div class="stat-value">{{ by_shift.day }}</div><div class="stat-label">day-shift stints</div></div>
+  <div class="stat stat-muted"><div class="stat-value">{{ by_shift.night }}</div><div class="stat-label">night-shift stints</div></div>
+</div>
+
+<div class="dash-card" style="margin-bottom:14px;">
+  <h3>Jobs supervised</h3>
+  <div class="table-wrap">
+  <table class="data-table" style="margin:0;">
+    <tr><th>Job</th><th>Client</th><th>Shift &amp; dates</th><th>Days</th><th></th></tr>
+    {% for r in jobs %}
+    <tr>
+      <td>
+        <div class="cell-title"><a href="{% url 'job_reports:detail' r.job.pk %}">{{ r.job.name }}</a></div>
+        <div class="cell-sub">{{ r.job.manifest.job_name }}</div>
+      </td>
+      <td>{{ r.job.manifest.client|default:"—" }}</td>
+      <td>
+        {% for a in r.stints %}
+        <div class="cell-sub" style="display:block;"><span class="pill">{{ a.get_shift_display }}</span> {{ a.start_date|date:"d M Y" }} &rarr; {% if a.end_date %}{{ a.end_date|date:"d M Y" }}{% else %}now{% endif %}</div>
+        {% endfor %}
+      </td>
+      <td>{{ r.days }}</td>
+      <td>{% if r.current %}<span class="pill valid">on it now</span>{% endif %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="5" class="dash-empty" style="padding:20px;">Not recorded as a supervisor on any job yet.</td></tr>{% endfor %}
+  </table>
+  </div>
+</div>
+
+<div class="dash-card">
+  <h3>Certificates <span class="dash-count">{{ certs|length }}</span></h3>
+  <div class="table-wrap">
+  <table class="data-table" style="margin:0;">
+    <tr><th>Course</th><th>Expires</th><th></th></tr>
+    {% for c in certs %}
+    <tr>
+      <td>{{ c.course.course_name }}</td>
+      <td>{{ c.expiry_date|date:"d M Y"|default:"no expiry" }}</td>
+      <td>{% if c.expiry_date %}{% if c.expiry_date < today %}<span class="pill expired">expired</span>{% else %}<span class="pill valid">valid</span>{% endif %}{% endif %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="3" class="dash-empty" style="padding:20px;">No certificates recorded.</td></tr>{% endfor %}
+  </table>
+  </div>
+</div>
+{% endblock %}

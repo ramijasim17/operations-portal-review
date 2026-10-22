@@ -1,0 +1,58 @@
+{% extends "core/base.html" %}
+{% load approval_tags %}
+{% block content %}
+<h1>History &mdash; {{ record.asset_serial }}</h1>
+<p class="page-sub">{% if asset %}<a href="{% url 'departments:asset_detail' asset.pk %}">Asset overview</a> &middot; {% endif %}{{ record.get_activity_display }} &middot; {{ record.schedule_text }} &middot; {{ record.place_text }}</p>
+{% if user.profile.can_edit %}<p><a data-modal class="btn" href="{% url 'maintenance:raise_action' record.pk %}">+ Raise an action</a> <a data-modal class="btn" href="{% url 'qhse:investigation_create' %}?maintenance={{ record.pk }}">Investigate</a></p>{% endif %}
+{% if user.profile.can_download %}<p><a class="btn" href="{% url 'maintenance:history_pdf' record.pk %}">Download all reports as one PDF</a></p>{% endif %}
+<div class="table-wrap">
+<table class="data-table">
+  <tr><th>Date</th><th>What</th><th>Result</th><th>By</th><th>Notes</th><th>File</th></tr>
+  {% for log in logs %}
+  <tr>
+    <td style="white-space:nowrap;">{{ log.done_date|date:"d M Y" }}</td>
+    <td><span class="pill {% if log.event == 'failure' %}expired{% else %}valid{% endif %}">{{ log.get_event_display }}</span> {% approval_badge log "maintenance_log" %}</td>
+    <td>{% if log.result %}<span class="pill {% if log.result == 'Pass' %}valid{% else %}expired{% endif %}">{{ log.result }}</span>{% else %}—{% endif %}</td>
+    <td>{{ log.by.username|default:"—" }}</td>
+    <td>{{ log.notes|default:"—" }}</td>
+    <td>{% if log.file %}{% if user.profile.can_download %}<a href="{{ log.file.url }}" target="_blank">Open</a>{% else %}<span class="cell-sub">Restricted</span>{% endif %}{% else %}—{% endif %}</td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="6" class="dash-empty" style="padding:20px;">Nothing recorded yet. It appears here each time the job is marked done or a failure is logged.</td></tr>
+  {% endfor %}
+</table>
+</div>
+
+{% if linked_actions %}
+<h3 style="margin:22px 0 8px;">Actions from this job <span class="dash-count">{{ linked_actions|length }}</span></h3>
+<div class="dash-card">
+  {% for a in linked_actions %}
+  <div style="display:flex; justify-content:space-between; gap:10px; padding:8px 0; {% if not forloop.first %}border-top:1px solid var(--border);{% endif %}">
+    <div class="cell-title"><a href="{% url 'action_tracker:detail' a.pk %}">{{ a.action_item }}</a>
+      <div class="cell-sub">{{ a.assignee|default:"unassigned" }}{% if a.due_date %} &middot; due {{ a.due_date|date:"j M Y" }}{% endif %}</div></div>
+    <span class="pill {% if not a.is_open %}valid{% elif a.is_overdue %}expired{% elif a.status == 'In Progress' %}soon{% endif %}" style="align-self:flex-start;">{% if a.is_overdue %}Overdue{% else %}{{ a.status }}{% endif %}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if qhse_inspections or qhse_incidents %}
+<h3 style="margin:22px 0 8px;">Also on record for {{ record.asset_serial }} in QHSE</h3>
+<div class="dash-card">
+  {% for i in qhse_inspections %}
+  <div style="display:flex; justify-content:space-between; gap:10px; padding:6px 0;">
+    <div class="cell-title"><a href="{% url 'qhse:inspection_detail' i.pk %}">{{ i.reference }} &middot; {{ i.title }}</a>
+      <div class="cell-sub">{{ i.get_kind_display }} &middot; {% if i.is_done %}done {{ i.done_date|date:"j M Y" }}{% else %}due {{ i.due_date|date:"j M Y" }}{% endif %}</div></div>
+    {% if i.result %}<span class="pill {{ i.result_pill }}" style="align-self:flex-start;">{{ i.result }}</span>{% else %}<span class="pill {{ i.status_pill }}" style="align-self:flex-start;">{{ i.status_text }}</span>{% endif %}
+  </div>
+  {% endfor %}
+  {% for i in qhse_incidents %}
+  <div style="display:flex; justify-content:space-between; gap:10px; padding:6px 0;">
+    <div class="cell-title"><a href="{% url 'qhse:incident_detail' i.pk %}">{{ i.reference }} &middot; {{ i.title }}</a>
+      <div class="cell-sub">{{ i.get_incident_type_display }} &middot; {{ i.date|date:"j M Y" }}</div></div>
+    <span class="pill {{ i.severity_pill }}" style="align-self:flex-start;">{{ i.severity }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

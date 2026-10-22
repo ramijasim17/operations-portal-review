@@ -1,0 +1,11 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'wire_management:list' %}">Wire Management</a> / Edit {{ drum.drum_number }}</p>
+<h1>Edit drum</h1>
+<form method="post" style="max-width:480px;">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Save</button>
+  <a class="btn" href="{% url 'wire_management:list' %}">Cancel</a>
+</form>
+{% endblock %}

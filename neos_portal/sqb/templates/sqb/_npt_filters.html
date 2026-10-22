@@ -1,0 +1,25 @@
+{# Shared period picker. Expects: period, period_choices, and extra hidden fields in `extra`. #}
+<div class="npt-filter">
+  <label>Period</label>
+  <select name="period" id="period-select">
+    {% for value, label in period_choices %}<option value="{{ value }}" {% if period.key == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+</div>
+<div class="npt-filter" id="month-field" style="display:none;"><label>Month</label><input type="month" name="month" value="{{ period.month_value }}"></div>
+<div class="npt-filter" id="from-field" style="display:none;"><label>From</label><input type="date" name="from" value="{{ period.from_value }}"></div>
+<div class="npt-filter" id="to-field" style="display:none;"><label>To</label><input type="date" name="to" value="{{ period.to_value }}"></div>
+<script>
+  (function () {
+    var select = document.getElementById("period-select");
+    function sync() {
+      document.getElementById("month-field").style.display = select.value === "month" ? "" : "none";
+      document.getElementById("from-field").style.display = select.value === "custom" ? "" : "none";
+      document.getElementById("to-field").style.display = select.value === "custom" ? "" : "none";
+    }
+    select.addEventListener("change", function () {
+      sync();
+      if (select.value !== "month" && select.value !== "custom") select.form.submit();
+    });
+    sync();
+  })();
+</script>

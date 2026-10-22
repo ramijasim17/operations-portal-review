@@ -1,0 +1,11 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Log a failure</h1>
+<p class="page-sub"><strong>{{ record.asset_serial }}</strong> &middot; the maintenance becomes due on the date of the failure and shows as overdue until it is marked done.</p>
+<form method="post" data-confirm="Log this failure? The asset will show as needing maintenance.">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Log failure</button>
+  <a class="btn" href="{% url 'maintenance:list' %}">Cancel</a>
+</form>
+{% endblock %}

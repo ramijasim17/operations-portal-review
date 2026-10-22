@@ -1,0 +1,11 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Mark as done</h1>
+<p class="page-sub"><strong>{{ record.asset_serial }}</strong> &middot; {{ record.get_activity_display }} &middot; {{ record.schedule_text }}{% if record.is_recurring %} &mdash; the next due date is worked out from the date you enter.{% endif %}</p>
+<form method="post" enctype="multipart/form-data" data-confirm="Record this as done?">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Mark done</button>
+  <a class="btn" href="{% url 'maintenance:list' %}">Cancel</a>
+</form>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Delete field/well "{{ field.name }}"?</h1>
+<p class="page-sub">If any wire log entries still reference this field/well, the delete will be blocked instead of leaving them without one.</p>
+<form method="post">
+  {% csrf_token %}
+  <button class="btn btn-primary" type="submit">Yes, delete it</button>
+  <a data-modal class="btn" href="{% url 'wire_management:field_well_manage' %}">Cancel</a>
+</form>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "core/base.html" %}
+{% load personnel_extras %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'personnel:list' %}">Personnel</a> / Certificates</p>
+<h1>Training Certificates</h1>
+
+<table class="data-table">
+  <tr>
+    <th>Name</th>
+    {% for c in courses %}<th>{{ c.course_name }}</th>{% endfor %}
+  </tr>
+  {% for p in people %}
+  <tr>
+    <td>{{ p.name }}</td>
+    {% for c in courses %}
+      {% with cert=certs_by_person|get_item:p.id|get_item:c.id %}
+      <td>
+        {% if cert %}
+          <span class="pill {{ cert.status }}">{{ cert.status }}</span>
+          {% if cert.expiry_date %}<span class="page-sub">{{ cert.expiry_date }}</span>{% endif %}
+          {% if user.profile.can_edit %}<a data-modal href="{% url 'personnel:cert_edit' cert.pk %}">edit</a>{% endif %}
+        {% else %}
+          {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'personnel:cert_create' %}?personnel={{ p.id }}&course={{ c.id }}">add</a>{% endif %}
+        {% endif %}
+      </td>
+      {% endwith %}
+    {% endfor %}
+  </tr>
+  {% empty %}
+  <tr><td colspan="{{ courses|length|add:1 }}">No active personnel yet.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

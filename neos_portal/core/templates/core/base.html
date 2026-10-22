@@ -1,0 +1,107 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ABC Operations Portal{% endblock %}</title>
+  <meta name="theme-color" content="#43358A">
+  <link rel="icon" type="image/png" sizes="32x32" href="{% static 'core/brand/favicon-32.png' %}">
+  <link rel="icon" type="image/png" sizes="192x192" href="{% static 'core/brand/favicon-192.png' %}">
+  <link rel="apple-touch-icon" href="{% static 'core/brand/apple-touch-icon.png' %}">
+  <link rel="stylesheet" href="{% static 'core/css/portal.css' %}?v={{ asset_version }}">
+  <script src="{% static 'core/js/theme.js' %}?v={{ asset_version }}"></script>
+</head>
+<body>
+  <div class="signature-band" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="white-tab" href="{% url 'core:dashboard' %}" aria-label="ABC Company, home">
+        <img src="{% static 'core/brand/neos-lockup.png' %}" alt="ABC Company" width="190" height="37">
+      </a>
+      <div class="portal-name">Operations Portal</div>
+      <nav>
+        {% for item in nav_items %}
+          {% if item.children %}
+          <div class="nav-group {% if item.is_active %}has-active open-drawer{% endif %}" data-nav-group>
+            <button type="button" class="nav-group-btn {% if item.is_active %}active{% endif %}" aria-haspopup="true" aria-expanded="false">{{ item.label }}<span class="nav-chev" aria-hidden="true"></span></button>
+            <div class="nav-flyout" role="menu" aria-label="{{ item.label }}">
+              <div class="nav-flyout-head">{{ item.label }}</div>
+              {% for c in item.children %}
+              <a href="{% url c.url_name %}" role="menuitem" class="{% if c.is_active %}active{% endif %}"><span class="nf-text"><b>{{ c.label }}</b><small>{{ c.hint }}</small></span></a>
+              {% endfor %}
+            </div>
+          </div>
+          {% else %}
+          <a href="{% url item.url_name %}" class="{% if item.is_active %}active{% endif %}">{{ item.label }}{% if item.url_name == 'approvals:inbox' and pending_approvals %} <span class="notif-badge nav-count">{{ pending_approvals }}</span>{% endif %}</a>
+          {% endif %}
+        {% endfor %}
+      </nav>
+      <div class="sidebar-foot">
+        <div class="notif-row">
+        <a class="notif-link {% if request.resolver_match.namespace == 'notifications' %}active{% endif %}" href="{% url 'notifications:list' %}" data-latest="{{ unread_latest_id|default:0 }}" id="notif-link">
+          <span>&#128276; Notifications</span><span class="notif-badge" id="notif-badge" {% if not unread_count %}hidden{% endif %}>{{ unread_count|default:0 }}</span>
+        </a>
+        <button type="button" class="sound-toggle" id="sound-toggle" aria-pressed="true" title="Notification sound: on" aria-label="Notification sound">&#128266;</button>
+        </div>
+        {% include "core/_theme_switch.html" %}
+        <div class="user-box">
+          <div class="who">{{ request.user.username }} · {{ user_role|title }}</div>
+          <form method="post" action="{% url 'accounts:logout' %}" data-noconfirm>
+            {% csrf_token %}
+            <button type="submit" class="link-button">Sign out</button>
+          </form>
+        </div>
+      </div>
+    </aside>
+    <div class="nav-backdrop" id="nav-backdrop"></div>
+    <main class="main">
+      <div class="menu-bar">
+        <button type="button" class="menu-toggle" id="menu-toggle" aria-label="Open menu" aria-controls="sidebar">&#9776; Menu</button>
+        <span class="menu-title">ABC Operations Portal</span>
+        <img class="menu-logo" src="{% static 'core/brand/neos-lockup.png' %}" alt="ABC Company" width="153" height="30">
+        <a class="menu-bell" href="{% url 'notifications:list' %}" aria-label="Notifications">&#128276;<span class="notif-badge" id="notif-badge-top" {% if not unread_count %}hidden{% endif %}>{{ unread_count|default:0 }}</span></a>
+      </div>
+      <div id="toast-stack" aria-live="polite">
+        {% for message in messages %}
+          <div class="toast toast-{{ message.level_tag|default:'info' }}" role="status">
+            <span class="toast-icon" aria-hidden="true"></span>
+            <div class="toast-body">
+              <div class="toast-title">{% if message.level_tag == 'success' %}Done{% elif message.level_tag == 'error' %}Something went wrong{% elif message.level_tag == 'warning' %}Please check{% else %}Notice{% endif %}</div>
+              <div class="toast-text">{{ message }}</div>
+            </div>
+            <button type="button" class="toast-close" aria-label="Dismiss">&times;</button>
+          </div>
+        {% endfor %}
+      </div>
+      {% block content %}{% endblock %}
+      <footer class="app-footer">
+        <span><span class="spark"></span>&nbsp; ABC Operations Portal</span>
+        <span>Designed and built by <b>Rami Jasim</b></span>
+      </footer>
+    </main>
+  </div>
+
+  <!-- Confirmation window: used for deletes and before saving/adding.
+       Driven by static/core/js/portal.js; add data-confirm="..." to any
+       link or button to use it. -->
+  <dialog id="confirm-modal" class="nc-dialog nc-confirm">
+    <div class="nc-confirm-icon" aria-hidden="true">!</div>
+    <h3 id="confirm-title">Please confirm</h3>
+    <p id="confirm-message"></p>
+    <div class="nc-dialog-actions">
+      <button type="button" class="btn" id="confirm-no">Cancel</button>
+      <button type="button" class="btn btn-primary" id="confirm-yes">Yes, continue</button>
+    </div>
+  </dialog>
+
+  <!-- Popup window for add / edit forms (links marked data-modal). -->
+  <dialog id="form-modal" class="nc-dialog nc-form-dialog">
+    <button type="button" class="nc-dialog-x" data-close-modal aria-label="Close">&times;</button>
+    <div id="form-modal-body"></div>
+  </dialog>
+
+  <form id="post-link-form" method="post" style="display:none;">{% csrf_token %}</form>
+  <script src="{% static 'core/js/portal.js' %}?v={{ asset_version }}"></script>
+</body>
+</html>

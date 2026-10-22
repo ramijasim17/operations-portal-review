@@ -1,0 +1,61 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>{% if record %}Edit{% else %}New{% endif %} maintenance / test</h1>
+<p class="page-sub">Pick what it is and how often it happens. The next due date is worked out for you, and moves on every time you mark it done.</p>
+<form method="post" enctype="multipart/form-data" id="maintenance-form">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <datalist id="asset-serial-list">
+    {% for s in asset_serials %}<option value="{{ s }}">{% endfor %}
+  </datalist>
+  <button class="btn btn-primary" type="submit">Save</button>
+  <a class="btn" href="{% url 'maintenance:list' %}">Cancel</a>
+</form>
+{{ levels|json_script:"level-intervals" }}
+<script>
+(function () {
+  var form = document.getElementById("maintenance-form");
+  if (!form) return;
+  var $ = function (name) { return form.querySelector("[name=" + name + "]"); };
+  var row = function (name) { return $(name) && $(name).closest("p"); };
+  var intervals = JSON.parse(document.getElementById("level-intervals").textContent);
+
+  // "Times [n] every [n] [unit]" sits on one line.
+  var repeat = document.createElement("div");
+  repeat.className = "repeat-row";
+  ["times_per", "every_count", "every_unit"].forEach(function (n) { if (row(n)) repeat.appendChild(row(n)); });
+  var unitLabel = row("every_unit") && row("every_unit").querySelector("label");
+  if (unitLabel) unitLabel.style.visibility = "hidden";   // aligns the unit box with the two number boxes
+  var anchor = row("due_date");
+  if (anchor) anchor.before(repeat); else form.appendChild(repeat);
+
+  var hint = document.createElement("div");
+  hint.className = "cell-sub";
+  hint.style.margin = "-4px 0 10px";
+  hint.style.flexBasis = "100%";
+  repeat.before(hint);
+
+  function show(el, on) { if (el) el.style.display = on ? "" : "none"; }
+
+  function update() {
+    var schedule = $("schedule").value, level = $("maintenance_level").value;
+    var levelled = schedule === "levelled", repeating = schedule === "repeating";
+    var levelHasPeriod = levelled && level && intervals[level];
+    show(row("maintenance_level"), levelled);
+    // Repeat fields: always for "repeats"; for a level only when it has no period of its own.
+    show(repeat, repeating || (levelled && level && !levelHasPeriod));
+    show(row("due_date"), schedule !== "on_failure");
+    hint.style.display = levelled && level ? "" : "none";
+    hint.textContent = levelHasPeriod
+      ? "This level is done " + intervals[level].toLowerCase() + " (set under Manage levels)."
+      : (levelled && level ? "This level has no period yet — enter how often below." : "");
+    var atLocation = $("place").value === "location";
+    show(row("location_name"), atLocation);
+    var dueLabel = row("due_date") && row("due_date").querySelector("label");
+    if (dueLabel) dueLabel.textContent = schedule === "one_off" ? "Due date" : "Next due (leave empty to start one period from today)";
+  }
+  ["schedule", "maintenance_level", "place"].forEach(function (n) { $(n).addEventListener("change", update); });
+  update();
+})();
+</script>
+{% endblock %}

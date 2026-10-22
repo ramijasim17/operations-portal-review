@@ -1,0 +1,55 @@
+{% extends "core/base.html" %}
+{% block title %}{{ item.reference }} · Carry out audit{% endblock %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'qhse:inspection_detail' item.pk %}">{{ item.reference }}</a> / carry out</p>
+<h1>{{ item.title }}</h1>
+<p class="page-sub">{{ item.template.name }} &middot; {{ item.get_scope_display }} {{ item.get_kind_display|lower }}{% if item.asset_serial %} &middot; {{ item.asset_serial }}{% endif %} &middot; pass mark {{ item.template.pass_mark }}%. <strong>{{ answered }} of {{ total }}</strong> points answered.</p>
+{% if errors %}<div class="alert alert-error">Some points need attention before you can finish. They are marked below.</div>{% endif %}
+<form method="post" enctype="multipart/form-data" data-noconfirm>
+  {% csrf_token %}
+  <div class="dash-card" style="margin-bottom:14px;">
+    <div style="display:flex; gap:14px; flex-wrap:wrap;">
+      <label style="flex:1 1 160px;">Date<br><input type="date" name="done_date" value="{{ today|date:'Y-m-d' }}"></label>
+      <label style="flex:1 1 200px;">Done by<br><input type="text" name="inspector" value="{{ item.inspector }}"></label>
+      {% if item.scope == 'external' %}<label style="flex:1 1 220px;">External auditor / company<br><input type="text" name="auditor_company" value="{{ item.auditor_company }}"></label>{% endif %}
+    </div>
+    {% if errors.date %}<p class="cell-sub" style="color:var(--danger);">{{ errors.date }}</p>{% endif %}
+  </div>
+  {% for part in parts %}
+  <div class="dash-card" style="margin-bottom:14px;">
+    <h3>{{ forloop.counter }}. {{ part.title }}</h3>
+    {% for a in part.rows %}
+    <div style="padding:10px 0; border-top:1px solid var(--border); margin-top:8px;">
+      <div class="cell-title">{{ a.point_text }} {% if a.critical %}<span class="pill expired">critical</span>{% endif %}</div>
+      {% if a.guidance %}<div class="cell-sub">{{ a.guidance }}</div>{% endif %}
+      <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:8px;">
+        {% if a.answer_type == 'number' %}
+          <label>Measured <input type="text" name="value_{{ a.pk }}" value="{{ a.value|default_if_none:'' }}" inputmode="decimal" style="width:120px;"> {{ a.unit }}</label>
+          <span class="cell-sub">allowed: {{ a.limit_text }}</span>
+          {% if a.outcome %}<span class="pill {{ a.outcome_pill }}">{{ a.get_outcome_display }}</span>{% endif %}
+        {% else %}
+          <label><input type="radio" name="outcome_{{ a.pk }}" value="compliant" {% if a.outcome == 'compliant' %}checked{% endif %}> Compliant</label>
+          <label><input type="radio" name="outcome_{{ a.pk }}" value="non_compliant" {% if a.outcome == 'non_compliant' %}checked{% endif %}> Non-compliant</label>
+          <label><input type="radio" name="outcome_{{ a.pk }}" value="na" {% if a.outcome == 'na' %}checked{% endif %}> N/A</label>
+        {% endif %}
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;">
+        <input type="text" name="notes_{{ a.pk }}" value="{{ a.notes }}" placeholder="Notes{% if a.note_required %} (required if it fails){% endif %}" style="flex:1 1 280px;">
+        <input type="file" name="file_{{ a.pk }}" accept="image/*,application/pdf" style="flex:0 1 240px;">
+      </div>
+      {% if a.file %}<div class="cell-sub">File attached.</div>{% endif %}
+      {% for pk, msg in errors.items %}{% if pk == a.pk %}<div class="cell-sub" style="color:var(--danger); margin-top:4px;">{{ msg }}</div>{% endif %}{% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+  <div class="dash-card">
+    <label><input type="checkbox" name="raise_actions" value="1" checked> Raise an action in the Action Tracker for every non-compliant point (due in 14 days)</label>
+    <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn btn-primary" type="submit" name="finish" value="1">Finish and score</button>
+      <button class="btn" type="submit" name="finish" value="0">Save progress</button>
+      <a class="btn" href="{% url 'qhse:inspection_detail' item.pk %}">Close</a>
+    </div>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Raise an action</h1>
+<p class="page-sub">For <strong>{{ record.asset_serial }}</strong> &middot; {{ record.get_activity_display }}. It is created in the Action Tracker and linked back to this job.</p>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Create action</button>
+  <a class="btn" href="{% url 'maintenance:history' record.pk %}">Cancel</a>
+</form>
+{% endblock %}

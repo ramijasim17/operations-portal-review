@@ -1,0 +1,77 @@
+{% extends "core/base.html" %}
+{% block title %}{{ item.reference }} · QHSE{% endblock %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'qhse:inspection_list' %}">QHSE inspections</a> / {{ item.reference }}</p>
+<div class="page-head">
+  <div>
+    <h1>{{ item.title }}</h1>
+    <p class="page-sub">
+      <span class="pill">{{ item.get_kind_display }}</span>
+      <span class="pill">{{ item.get_scope_display }}</span>
+      {% if item.department %}<span class="pill">{{ item.department.name }}</span>{% endif %}
+      {% if item.score is not None %}<span class="pill {{ item.result_pill }}">{{ item.score }}%</span>{% endif %}
+      <span class="pill {{ item.status_pill }}">{{ item.status_text }}</span>
+      {% if item.result %}<span class="pill {{ item.result_pill }}">{{ item.result }}</span>{% endif %}
+      {% if item.area %}&nbsp;{{ item.area }}{% endif %}
+      <br><span class="cell-sub">{{ item.reference }} &middot; {% if item.is_done %}done {{ item.done_date|date:"j M Y" }}{% elif item.due_date %}due {{ item.due_date|date:"j M Y" }}{% endif %}{% if item.inspector %} &middot; {{ item.inspector }}{% endif %}{% if item.template %} &middot; template: <a href="{% url 'qhse:template_detail' item.template.pk %}">{{ item.template.name }}</a>{% endif %}{% if item.auditor_company %} &middot; {{ item.auditor_company }}{% endif %}{% if item.repeat_months %} &middot; repeats every {{ item.repeat_months }} month{{ item.repeat_months|pluralize }}{% endif %}</span>
+    </p>
+  </div>
+  <div class="page-head-actions">
+    {% if user.profile.can_edit %}
+      <a data-modal class="btn" href="{% url 'qhse:inspection_edit' item.pk %}">Edit</a>
+      {% if not item.is_done %}{% if item.template_id %}<a class="btn btn-primary" href="{% url 'qhse:inspection_conduct' item.pk %}">Carry out the audit</a>{% else %}<a data-modal class="btn btn-primary" href="{% url 'qhse:inspection_done' item.pk %}">Mark done</a>{% endif %}{% endif %}
+    {% endif %}
+    {% if user.profile.can_delete %}<form method="post" action="{% url 'qhse:inspection_delete' item.pk %}">{% csrf_token %}<button class="btn" type="submit" data-confirm="Delete this inspection?">Delete</button></form>{% endif %}
+  </div>
+</div>
+{% if parts %}
+<div class="dash-card" style="margin-bottom:14px;">
+  <h3>Results by point</h3>
+  {% for part in parts %}
+  <h4 style="margin:14px 0 4px;">{{ forloop.counter }}. {{ part.title }}</h4>
+  {% for a in part.rows %}
+  <div style="display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-top:1px solid var(--border);">
+    <div class="cell-title">{{ a.point_text }}{% if a.critical %} <span class="pill expired">critical</span>{% endif %}
+      {% if a.answer_type == 'number' and a.value is not None %}<div class="cell-sub">measured {{ a.value|floatformat:"-3" }} {{ a.unit }} (allowed {{ a.limit_text }})</div>{% endif %}
+      {% if a.notes %}<div class="cell-sub">{{ a.notes }}</div>{% endif %}
+      {% if a.file and user.profile.can_download %}<div class="cell-sub"><a href="{{ a.file.url }}" target="_blank">file</a></div>{% endif %}
+      {% if a.action %}<div class="cell-sub">Action: <a href="{% url 'action_tracker:detail' a.action.pk %}">{{ a.action.action_item|truncatechars:70 }}</a> ({{ a.action.status }})</div>{% endif %}</div>
+    <span class="pill {{ a.outcome_pill }}" style="align-self:flex-start;">{% if a.outcome %}{{ a.get_outcome_display }}{% else %}Not answered{% endif %}</span>
+  </div>
+  {% endfor %}{% endfor %}
+</div>
+{% endif %}
+<div class="dash-card" style="margin-bottom:14px;">
+  <h3>Findings</h3>
+  <p style="margin:0;">{{ item.findings|default:"Nothing recorded."|linebreaksbr }}</p>
+  {% if item.file %}<p style="margin:10px 0 0;">{% if user.profile.can_download %}<a href="{{ item.file.url }}" target="_blank">Open report</a>{% else %}<span class="cell-sub">Report restricted</span>{% endif %}</p>{% endif %}
+</div>
+{% if asset or item.asset_serial %}
+<div class="dash-card" style="margin-bottom:14px;">
+  <h3>Equipment <span class="dash-sub" style="display:inline; margin-left:6px;">inspected</span></h3>
+  {% if asset %}
+  <p style="margin:0 0 6px;"><a href="{% url 'departments:asset_detail' asset.pk %}"><strong>{{ asset.name }}</strong></a> &middot; {{ asset.description }} <span class="cell-sub">&middot; {{ asset.current_location }}</span></p>
+  {% else %}<p style="margin:0 0 6px;">{{ item.asset_serial }} <span class="cell-sub">&middot; not found in Departments</span></p>{% endif %}
+  {% for j in jobs %}
+  <div style="display:flex; justify-content:space-between; gap:10px; padding:6px 0; border-top:1px solid var(--border);">
+    <div class="cell-title"><a href="{% url 'maintenance:history' j.pk %}">{{ j.get_activity_display }} &middot; {{ j.schedule_text }}</a>
+      <div class="cell-sub">last done {{ j.last_done|date:"j M Y"|default:"never" }}{% if j.due_date %} &middot; next due {{ j.due_date|date:"j M Y" }}{% endif %}</div></div>
+    <span class="pill {{ j.status }}" style="align-self:flex-start;">{% if j.status == 'expired' %}Overdue{% elif j.status == 'soon' %}Due soon{% elif j.status == 'valid' %}On schedule{% elif j.status == 'standby' %}Standby{% else %}No date{% endif %}</span>
+  </div>
+  {% empty %}{% if asset %}<p class="cell-sub" style="margin:0;">No active maintenance job for this equipment.</p>{% endif %}{% endfor %}
+</div>
+{% endif %}
+<div class="dash-card">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+    <h3 style="margin:0;">Corrective actions <span class="dash-count">{{ linked|length }}</span></h3>
+    {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'qhse:inspection_action' item.pk %}">+ Raise corrective action</a>{% endif %}
+  </div>
+  {% for a in linked %}
+  <div style="display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--border); margin-top:8px;">
+    <div class="cell-title"><a href="{% url 'action_tracker:detail' a.pk %}">{{ a.action_item }}</a>
+      <div class="cell-sub">{{ a.assignee|default:"unassigned" }}{% if a.due_date %} &middot; due {{ a.due_date|date:"j M Y" }}{% endif %}</div></div>
+    <span class="pill {% if not a.is_open %}valid{% elif a.is_overdue %}expired{% elif a.status == 'In Progress' %}soon{% endif %}" style="align-self:flex-start;">{% if a.is_overdue %}Overdue{% else %}{{ a.status }}{% endif %}</span>
+  </div>
+  {% empty %}<p class="dash-empty" style="margin-top:10px;">No corrective actions. If the result was a fail, raise one here.</p>{% endfor %}
+</div>
+{% endblock %}

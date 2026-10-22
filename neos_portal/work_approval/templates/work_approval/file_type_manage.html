@@ -1,0 +1,25 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Approval types</h1>
+<p class="page-sub">Kinds of record you keep here, for example Work Approval, SOC, ATO.</p>
+<div class="table-wrap">
+<table class="data-table">
+  <tr><th>Type</th><th></th></tr>
+  {% for t in types %}
+  <tr>
+    <td class="cell-title">{{ t.type_name }}</td>
+    <td class="actions-cell">{% if user.profile.can_delete %}<form method="post" action="{% url 'work_approval:file_type_delete' t.pk %}">{% csrf_token %}<button class="btn" type="submit" data-confirm="Delete this type and all its records?">Delete</button></form>{% endif %}</td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="2" class="dash-empty" style="padding:18px;">No types yet.</td></tr>
+  {% endfor %}
+</table>
+</div>
+<h2 style="margin-top:22px;">New type</h2>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Create</button>
+  <a class="btn" href="{% url 'work_approval:list' %}">Back</a>
+</form>
+{% endblock %}

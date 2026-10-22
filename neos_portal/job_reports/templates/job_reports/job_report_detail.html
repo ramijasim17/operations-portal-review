@@ -1,0 +1,101 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'job_reports:list' %}">Job Reports</a> / {{ report.name }}</p>
+
+<div class="page-head">
+  <div>
+    <h1>{{ report.name }}</h1>
+    <p class="page-sub">
+      Manifest <a href="{% url 'job_manager:detail' report.manifest.pk %}">{{ report.manifest.job_name }}</a>
+      &middot; {{ report.manifest.client|default:"no client" }} &middot; {{ report.manifest.date|date:"j M Y"|default:"no date" }}
+    </p>
+    {% if report.description %}<p class="page-sub" style="margin-top:6px;">{{ report.description }}</p>{% endif %}
+    {% if report.callout_days %}<p class="page-sub" style="margin-top:6px;">Call-out: <strong>{{ report.callout_start|date:"j M Y" }} &rarr; {{ report.callout_end|date:"j M Y" }}</strong> &middot; {{ report.callout_days }} day{{ report.callout_days|pluralize }}</p>{% endif %}
+  </div>
+  <div class="page-head-actions">
+    {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'job_reports:edit' report.pk %}">Edit job</a>{% endif %}
+  </div>
+</div>
+
+{# the sequence: manifest -> job -> survey report -> SQB #}
+<div class="steps">
+  <div class="step is-done">
+    <span class="step-dot">&#10003;</span>
+    <div class="step-title">1 &middot; Manifest</div>
+    <div class="step-body"><a href="{% url 'job_manager:detail' report.manifest.pk %}">{{ report.manifest.job_name }}</a></div>
+    <div class="step-note">{{ report.manifest.status }}</div>
+  </div>
+  <div class="step is-done">
+    <span class="step-dot">&#10003;</span>
+    <div class="step-title">2 &middot; Job</div>
+    <div class="step-body">{{ report.name }}</div>
+    <div class="step-note">created {{ report.created_at|date:"j M Y" }}</div>
+  </div>
+  <div class="step {% if not report.needs_survey_report %}is-skip{% elif report.linked_sgs_report %}is-done{% else %}is-todo{% endif %}">
+    <span class="step-dot">{% if report.linked_sgs_report %}&#10003;{% elif report.needs_survey_report %}!{% else %}&ndash;{% endif %}</span>
+    <div class="step-title">3 &middot; Survey report</div>
+    <div class="step-body">{% if report.linked_sgs_report %}<a href="{% url 'sgs_report:detail' report.linked_sgs_report.pk %}">{{ report.survey_report_type }} in SGS Reports</a>{% elif report.needs_survey_report %}{{ report.survey_report_type }} needed{% else %}Not needed{% endif %}</div>
+    <div class="step-note">{% if report.linked_sgs_report %}{{ report.linked_sgs_report.status }}{% elif report.needs_survey_report %}not created yet{% else %}no SGS / FGS / PBU{% endif %}</div>
+  </div>
+  <div class="step {% if sqb_state == 'Closed' %}is-done{% else %}is-todo{% endif %}">
+    <span class="step-dot">{% if sqb_state == 'Closed' %}&#10003;{% else %}!{% endif %}</span>
+    <div class="step-title">4 &middot; SQB</div>
+    <div class="step-body">
+      {% for pkg in report.sqb_packages.all %}<a href="{% url 'sqb:package_detail' pkg.pk %}">{{ pkg.sqb_type.name }}</a>{% if not forloop.last %}, {% endif %}
+      {% empty %}Missing{% endfor %}
+    </div>
+    <div class="step-note">{% if sqb_state == 'Missing' %}{% if user.profile.can_edit %}<a data-modal href="{% url 'sqb:package_create' report.pk %}">Create SQB</a>{% else %}not created yet{% endif %}{% else %}{{ sqb_state }}{% endif %}</div>
+  </div>
+</div>
+
+<h2 style="margin-top:8px;">Supervisors ({{ assignments|length }})</h2>
+<p class="page-sub">Who is running this job, shift by shift. When the job runs for several days and the supervisor changes, add each person with the days they cover.</p>
+{% if user.profile.can_edit %}<p><a data-modal class="btn" href="{% url 'job_reports:supervisor_add' report.pk %}">+ Add supervisor</a></p>{% endif %}
+<div class="table-wrap">
+<table class="data-table">
+  <tr><th>Supervisor</th><th>Shift</th><th>From</th><th>Until</th><th>Days</th><th></th></tr>
+  {% for a in assignments %}
+  <tr {% if a.end_date and a.end_date < today %}style="opacity:.65;"{% endif %}>
+    <td><div class="cell-title">{{ a.person.name }}</div>{% if a.person.position %}<div class="cell-sub">{{ a.person.position }}</div>{% endif %}</td>
+    <td><span class="pill">{{ a.get_shift_display }}</span></td>
+    <td>{{ a.start_date|date:"d M Y" }}</td>
+    <td>{% if a.end_date %}{{ a.end_date|date:"d M Y" }}{% else %}<span class="pill valid">still on the job</span>{% endif %}</td>
+    <td>{% if a.end_date %}{{ a.days }}{% else %}<span class="cell-sub">ongoing</span>{% endif %}</td>
+    <td class="actions-cell">
+      {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'job_reports:supervisor_edit' a.pk %}">Edit</a>{% endif %}
+      {% if user.profile.can_delete %}<form method="post" action="{% url 'job_reports:supervisor_delete' a.pk %}">{% csrf_token %}<button class="btn" type="submit" data-confirm="Remove {{ a.person.name }} from this job?">Remove</button></form>{% endif %}
+    </td>
+  </tr>
+  {% empty %}<tr><td colspan="6" class="dash-empty" style="padding:20px;">No supervisor recorded yet.</td></tr>{% endfor %}
+</table>
+</div>
+
+<h2 style="margin-top:22px;">Documents ({{ documents|length }})</h2>
+<p class="page-sub">Daily Report, Job Program, Calculation Report, or anything else related to this job — PDF, Excel, or Word only.</p>
+{% if user.profile.can_edit %}<div data-popup-form="upload-document" data-popup-title="Upload a document" data-popup-button="+ Upload document"><form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  {{ doc_form.as_p }}
+  <button class="btn btn-primary" type="submit">Upload</button>
+</form></div>{% endif %}
+
+<table class="data-table">
+  <tr><th>Type</th><th>Title</th><th>File</th><th>Uploaded</th><th>Notes</th><th></th></tr>
+  {% for doc in documents %}
+  <tr>
+    <td><span class="pill">{{ doc.get_document_type_display }}</span></td>
+    <td>{{ doc.title|default:"—" }}</td>
+    <td>{% if user.profile.can_download %}<a href="{{ doc.file.url }}" target="_blank">Download</a>{% else %}<span class="page-sub">Restricted</span>{% endif %}</td>
+    <td>{{ doc.uploaded_at|date:"d M Y H:i" }}</td>
+    <td>{{ doc.notes|default:"—" }}</td>
+    <td>
+      {% if user.profile.can_delete %}<form method="post" action="{% url 'job_reports:document_delete' doc.pk %}" style="display:inline;">
+        {% csrf_token %}
+        <button class="btn" type="submit" data-confirm="Delete this document?">Delete</button>
+      </form>{% endif %}
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="6">No documents uploaded yet.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

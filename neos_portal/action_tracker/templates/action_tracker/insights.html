@@ -1,0 +1,117 @@
+{% extends "core/base.html" %}
+{% load sqb_extras dept %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'action_tracker:list' %}">Action Tracker</a> / Insights</p>
+
+<div class="page-head">
+  <div>
+    <h1>Action insights</h1>
+    <p class="page-sub">Who raised actions, what kind they are, how many each month and how long they took to close &mdash; for actions raised in {{ period.label }}.</p>
+  </div>
+</div>
+
+<div class="dept-bar">{% dept_scope %}</div>
+
+<form method="get" class="npt-filters" id="insights-form">
+  {% include "sqb/_npt_filters.html" %}
+  <div class="npt-filter">
+    <label>Raised by</label>
+    <select name="client" onchange="this.form.submit()">
+      <option value="">All</option>
+      {% for c in client_names %}<option value="{{ c }}" {% if client == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="npt-filter">
+    <label>Type</label>
+    <select name="type" onchange="this.form.submit()">
+      <option value="">All types</option>
+      {% for value, label in type_choices %}<option value="{{ value }}" {% if type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="npt-filter npt-filter-buttons">
+    <button class="btn btn-primary" type="submit">Apply</button>
+    <a class="btn" href="{% url 'action_tracker:insights' %}">Reset</a>
+  </div>
+</form>
+
+<div class="stat-strip">
+  <div class="stat"><div class="stat-value">{{ summary.raised }}</div><div class="stat-label">raised</div></div>
+  <div class="stat {% if summary.open %}stat-warn{% else %}stat-muted{% endif %}"><div class="stat-value">{{ summary.open }}</div><div class="stat-label">still open</div></div>
+  <div class="stat stat-good"><div class="stat-value">{{ summary.closed }}</div><div class="stat-label">closed</div></div>
+  <div class="stat"><div class="stat-value">{% if summary.timing.average is not None %}{{ summary.timing.average|floatformat:"-1" }}{% else %}&mdash;{% endif %}</div><div class="stat-label">avg days to close</div></div>
+  <div class="stat stat-muted"><div class="stat-value">{% if summary.timing.median is not None %}{{ summary.timing.median|floatformat:"-1" }}{% else %}&mdash;{% endif %}</div><div class="stat-label">median days</div></div>
+</div>
+{% if undated %}<p class="cell-sub" style="margin:-4px 0 12px;">{{ undated }} older action{{ undated|pluralize }} ha{{ undated|pluralize:"s,ve" }} no raised date, so {{ undated|pluralize:"it is,they are" }} not counted here. Edit {{ undated|pluralize:"it,them" }} to add the date.</p>{% endif %}
+
+<div class="dash-card" style="margin-bottom:14px;">
+  <h3>Actions raised per month {% if not client %}<span class="dash-sub" style="display:inline; margin-left:6px;">coloured by client</span>{% endif %}</h3>
+  <div class="chart">
+    <div class="chart-yaxis">{% for t in monthly.ticks %}<span class="y-tick" style="bottom:{{ t.bottom }}%;">{{ t.value|floatformat:"-1" }}</span>{% endfor %}</div>
+    <div class="chart-main">
+      <div class="chart-plot">
+        {% for t in monthly.ticks %}<div class="chart-grid" style="bottom:{{ t.bottom }}%;"></div>{% endfor %}
+        {% for b in monthly.bars %}
+        <div class="chart-col" title="{{ b.title }}: {{ b.total }} action{{ b.total|pluralize }}">
+          {% if b.total %}<span class="chart-val">{{ b.total }}</span>{% endif %}
+          <div class="chart-stack" style="height:{{ b.height }}%;">
+            {% for seg in b.segments %}<div class="chart-seg" title="{{ seg.label }}: {{ seg.count }}" style="flex:{{ seg.count }}; background:{{ seg.colour }};"></div>{% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="chart-axis">{% for b in monthly.bars %}<div class="chart-tick">{{ b.label }}{% if b.sub %}<small>{{ b.sub }}</small>{% endif %}</div>{% endfor %}</div>
+    </div>
+  </div>
+  {% if not client and by_client %}<div class="chart-legend">{% for c in by_client %}<span><i class="dot" style="background:{{ c.colour }};"></i> {{ c.label }}</span>{% endfor %}</div>{% endif %}
+</div>
+
+<div class="dash-card" style="margin-bottom:14px;">
+  <h3>By client <span class="dash-sub" style="display:inline; margin-left:6px;">{% if type %}{{ type }} only{% else %}all types{% endif %}</span></h3>
+  <div class="table-wrap">
+  <table class="data-table" style="margin:0;">
+    <tr><th>Raised by</th><th>Raised</th><th>Open</th><th>Closed</th><th>Overdue</th><th>Avg days to close</th><th>Slowest</th></tr>
+    {% for c in by_client %}
+    <tr>
+      <td><div class="cell-title"><span class="dot" style="background:{{ c.colour }};"></span><a href="?period={{ period.key }}{% if period.key == 'month' %}&month={{ period.month_value }}{% elif period.key == 'custom' %}&from={{ period.from_value }}&to={{ period.to_value }}{% endif %}&client={{ c.key|urlencode }}{% if type %}&type={{ type }}{% endif %}">{{ c.label }}</a></div></td>
+      <td><div class="progress"><div class="progress-track"><div class="progress-fill" style="width:{{ c.width }}%;"></div></div><span class="progress-text"><b>{{ c.raised }}</b></span></div></td>
+      <td>{{ c.open }}</td><td>{{ c.closed }}</td>
+      <td>{% if c.overdue %}<span class="pill expired">{{ c.overdue }}</span>{% else %}0{% endif %}</td>
+      <td>{% if c.average is not None %}<b>{{ c.average|floatformat:"-1" }}</b> d{% else %}<span class="cell-sub">&mdash;</span>{% endif %}</td>
+      <td>{% if c.timing.slowest is not None %}{{ c.timing.slowest }} d{% else %}<span class="cell-sub">&mdash;</span>{% endif %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="7" class="dash-empty" style="padding:20px;">No actions raised in this period.</td></tr>{% endfor %}
+  </table>
+  </div>
+</div>
+
+<div class="dash-row dash-row-2">
+  <div class="dash-card">
+    <h3>By type <span class="dash-sub" style="display:inline; margin-left:6px;">{% if client %}{{ client }}{% else %}all clients{% endif %}</span></h3>
+    <div class="table-wrap">
+    <table class="data-table" style="margin:0;">
+      <tr><th>Type</th><th>Raised</th><th>Share</th><th>Avg days to close</th></tr>
+      {% for t in by_type %}
+      <tr>
+        <td>{{ t.label }}</td>
+        <td><div class="progress"><div class="progress-track"><div class="progress-fill" style="width:{{ t.width }}%;"></div></div><span class="progress-text"><b>{{ t.raised }}</b></span></div></td>
+        <td>{{ t.share }}%</td>
+        <td>{% if t.average is not None %}{{ t.average|floatformat:"-1" }} d{% else %}<span class="cell-sub">&mdash;</span>{% endif %}</td>
+      </tr>
+      {% empty %}<tr><td colspan="4" class="dash-empty" style="padding:20px;">Nothing to show.</td></tr>{% endfor %}
+    </table>
+    </div>
+  </div>
+  <div class="dash-card">
+    <h3>Open the longest</h3>
+    {% for a in slowest %}
+    <div class="bar-row" style="grid-template-columns:1fr 70px;"><span class="bar-label"><a href="{% url 'action_tracker:detail' a.pk %}">{{ a.action_item|truncatechars:48 }}</a><br><span class="cell-sub">{{ a.client|default:"client not recorded" }}</span></span><span class="bar-count" style="width:auto;">{{ a.age_days }} d</span></div>
+    {% empty %}<div class="dash-empty">No open actions with a raised date.</div>{% endfor %}
+    {% if recent_closed %}
+    <h3 style="margin-top:18px;">Slowest to close</h3>
+    {% for a in recent_closed %}
+    <div class="bar-row" style="grid-template-columns:1fr 70px;"><span class="bar-label"><a href="{% url 'action_tracker:detail' a.pk %}">{{ a.action_item|truncatechars:48 }}</a><br><span class="cell-sub">{{ a.client|default:"client not recorded" }}</span></span><span class="bar-count" style="width:auto;">{{ a.days_to_close }} d</span></div>
+    {% endfor %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

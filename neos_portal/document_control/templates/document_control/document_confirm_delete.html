@@ -1,0 +1,9 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Delete "{{ document.name }}"?</h1>
+<form method="post">
+  {% csrf_token %}
+  <button class="btn btn-primary" type="submit">Delete</button>
+  <a class="btn" href="{% url 'document_control:list' %}">Cancel</a>
+</form>
+{% endblock %}

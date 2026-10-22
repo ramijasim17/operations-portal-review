@@ -1,0 +1,17 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'personnel:list' %}">Personnel</a> / Import from CSV</p>
+<h1>Import results</h1>
+
+<p>Updated {{ results.updated }} people, created {{ results.created }} new, set {{ results.certs }} certificate records.</p>
+
+{% if results.flagged %}
+<h2>Flagged — worth a look</h2>
+<ul>
+  {% for item in results.flagged %}<li>{{ item }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+<a class="btn" href="{% url 'personnel:list' %}">Back to Personnel</a>
+<a class="btn" href="{% url 'personnel:cert_matrix' %}">View certificate matrix</a>
+{% endblock %}

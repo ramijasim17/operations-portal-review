@@ -1,0 +1,224 @@
+{% extends "core/base.html" %}
+{% load departments_extras approval_tags %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'job_manager:list' %}">Job Manager</a> / {{ job.job_name }}</p>
+
+<div class="jm-head">
+  <div>
+    <h1>{{ job.job_name }}</h1>
+    <p class="page-sub" style="margin:0;">
+      {{ job.client|default:"No client" }} &middot; {{ job.date|default:"No date" }} &middot; {{ job.location|default:"No location" }}
+      {% if job.department %}&middot; {{ job.department.name }}{% endif %}
+      &middot; <span class="pill {% if job.status == 'Active' %}soon{% elif job.status == 'Completed' %}valid{% endif %}">{{ job.status }}</span>
+    </p>
+    <p class="page-sub" style="margin:4px 0 0; font-size:12px;">{{ job.job_number }}</p>
+  </div>
+  <div class="jm-actions">
+    {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'job_manager:import_serials' job.pk %}">Import serials</a>{% endif %}
+    {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'job_manager:edit' job.pk %}">Edit details</a>{% endif %}
+    {% if user.profile.can_download %}
+    <details class="menu">
+      <summary class="btn btn-primary">Export &#9662;</summary>
+      <div class="menu-list">
+        <a href="{% url 'job_manager:export_manifest' job.pk %}">Manifest (Excel)</a>
+        <a href="{% url 'job_manager:export_manifest_pdf' job.pk %}">Manifest (PDF)</a>
+        <a href="{% url 'job_manager:export_certs' job.pk %}">Certificate status (Excel)</a>
+        <a href="{% url 'job_manager:export_certs_zip' job.pk %}">All certificate files (ZIP)</a>
+      </div>
+    </details>
+    {% endif %}
+  </div>
+</div>
+
+{% approval_panel job "manifest" show_ok=True %}
+
+{# ── summary ── #}
+<div class="jm-stats">
+  <div class="jm-stat"><div class="jm-stat-value">{{ stats.total }}</div><div class="jm-stat-label">items on manifest</div></div>
+  <div class="jm-stat"><div class="jm-stat-value">{{ stats.dispatched }}</div><div class="jm-stat-label">dispatched</div></div>
+  <div class="jm-stat"><div class="jm-stat-value">{{ stats.reserved }}</div><div class="jm-stat-label">reserved (draft)</div></div>
+  <div class="jm-stat jm-stat-wide">
+    <div class="jm-stat-label" style="margin-bottom:6px;">By classification</div>
+    <div class="jm-chips">
+      {% for name, count in by_class %}<span class="jm-chip">{{ name }} <b>{{ count }}</b></span>{% empty %}<span class="page-sub" style="margin:0;">Nothing yet</span>{% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="jm-reports">
+  <strong>Job reports:</strong>
+  {% for jr in job.job_reports.all %}
+    <a class="pill" href="{% url 'job_reports:detail' jr.pk %}">{{ jr.name }}</a>
+  {% empty %}
+    <span class="page-sub" style="margin:0;">none yet</span>
+  {% endfor %}
+  {% if user.profile.can_edit %}<a data-modal class="jm-add-link" href="{% url 'job_reports:create' %}">+ New job report</a>{% endif %}
+</div>
+
+{# ── tabs ── #}
+<div class="jm-tabs">
+  <a href="?tab=manifest" class="tab-box {% if tab == 'manifest' %}active{% endif %}">Manifest <span class="tab-count">{{ stats.total }}</span></a>
+  {% if user.profile.can_edit %}<a href="?tab=add" class="tab-box {% if tab == 'add' %}active{% endif %}">Add equipment</a>{% endif %}
+  <a href="?tab=history" class="tab-box {% if tab == 'history' %}active{% endif %}">Transfer history <span class="tab-count">{{ transfers|length }}</span></a>
+</div>
+
+{% if tab == 'manifest' %}
+{# ═════════════ MANIFEST ═════════════ #}
+{% if stats.conflicts %}<div class="alert alert-error">{{ stats.conflicts }} item{{ stats.conflicts|pluralize }} on this manifest {{ stats.conflicts|pluralize:"is,are" }} also on another open manifest — see the red notes below and remove them from one of the two.</div>{% endif %}
+
+<div class="jm-toolbar">
+  <input type="search" id="manifest-filter" placeholder="Filter this manifest by serial, classification…" autocomplete="off">
+  {% if user.profile.can_edit and manifest_rows %}
+  <form id="transfer-form" method="post" data-confirm="Transfer the ticked items?" class="jm-transfer">
+    {% csrf_token %}
+    <span class="jm-tick-count" id="tick-count">0 ticked</span>
+    <select name="destination" required>
+      <option value="">Transfer to…</option>
+      <option value="workshop">Workshop (return)</option>
+      {% for m in other_manifests %}<option value="{{ m.pk }}">{{ m.job_name }} ({{ m.status }})</option>{% endfor %}
+    </select>
+    <input type="text" name="note" placeholder="Reason (optional)">
+    <button class="btn btn-primary" type="submit" name="transfer_serials" value="1">Transfer</button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="table-wrap">
+<table class="data-table" id="manifest-table">
+  <tr>
+    {% if user.profile.can_edit %}<th style="width:34px;"><input type="checkbox" id="tick-all" title="Tick all shown"></th>{% endif %}
+    <th>Asset No / Serial No</th><th>Classification</th><th>Status</th><th></th>
+  </tr>
+  {% for row in manifest_rows %}
+  <tr class="manifest-row">
+    {% if user.profile.can_edit %}<td><input type="checkbox" name="transfer_serial" value="{{ row.asset.name }}" form="transfer-form"></td>{% endif %}
+    <td><strong>{{ row.asset.name }}</strong>{% if row.asset.description %}<div class="page-sub" style="margin:0; font-size:12px;">{{ row.asset.description }}</div>{% endif %}
+      {% if row.also_on %}<div style="font-size:12px; color:var(--danger);">also on '{{ row.also_on.job_name }}'</div>{% endif %}</td>
+    <td>{{ row.asset.classification.name }}</td>
+    <td><span class="pill {% if row.state == 'Reserved (draft)' %}soon{% endif %}">{{ row.state }}</span>{% if row.where %}<div class="page-sub" style="margin:2px 0 0; font-size:12px;">{{ row.where }}</div>{% endif %}</td>
+    <td class="row-actions">
+      {% if user.profile.can_edit %}
+        {% if not row.asset.is_available %}
+        <form method="post" style="display:inline;">{% csrf_token %}<input type="hidden" name="return_serial" value="{{ row.asset.name }}">
+          <button class="btn btn-small" type="submit" data-confirm="Return this item to Workshop? It will become available for other jobs again.">Return</button></form>
+        {% endif %}
+        <form method="post" style="display:inline;">{% csrf_token %}<input type="hidden" name="remove_serial" value="{{ row.asset.name }}">
+          <button class="btn btn-small" type="submit" data-confirm="Remove from manifest?">Remove</button></form>
+      {% endif %}
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="5" class="dash-empty" style="padding:22px;">No equipment on this manifest yet.{% if user.profile.can_edit %} Use the <a href="?tab=add">Add equipment</a> tab.{% endif %}</td></tr>
+  {% endfor %}
+</table>
+</div>
+<script>
+  (function () {
+    var filter = document.getElementById("manifest-filter"), rows = document.querySelectorAll(".manifest-row");
+    var tickAll = document.getElementById("tick-all"), count = document.getElementById("tick-count");
+    function shown() { return Array.prototype.filter.call(rows, function (r) { return r.style.display !== "none"; }); }
+    function update() { if (count) count.textContent = document.querySelectorAll("input[name=transfer_serial]:checked").length + " ticked"; }
+    filter.addEventListener("input", function () {
+      var q = filter.value.trim().toLowerCase();
+      rows.forEach(function (r) { r.style.display = !q || r.textContent.toLowerCase().indexOf(q) !== -1 ? "" : "none"; });
+    });
+    if (tickAll) tickAll.addEventListener("change", function () {
+      shown().forEach(function (r) { var c = r.querySelector("input[name=transfer_serial]"); if (c) c.checked = tickAll.checked; });
+      update();
+    });
+    document.addEventListener("change", function (e) { if (e.target.name === "transfer_serial") update(); });
+  })();
+</script>
+
+{% elif tab == 'add' and user.profile.can_edit %}
+{# ═════════════ ADD EQUIPMENT ═════════════ #}
+<form method="get" class="jm-search">
+  <input type="hidden" name="tab" value="add">
+  <input type="search" name="search" placeholder="Search by Asset No / Serial No…" value="{{ search }}">
+  <button class="btn" type="submit">Search</button>
+  {% if search %}<a class="btn" href="?tab=add">Clear</a>{% endif %}
+</form>
+<p class="page-sub">Only equipment at the Workshop that isn't already on another open manifest is listed. To use something that's on another manifest, transfer it from there.</p>
+
+{% if search %}
+<form method="post">
+  {% csrf_token %}
+  <div class="table-wrap">
+  <table class="data-table">
+    <tr><th style="width:34px;"></th><th>Asset No / Serial No</th><th>Department</th><th>Classification</th></tr>
+    {% for a in search_results %}
+    <tr class="pickable-row" style="cursor:pointer;" onclick="if (event.target.type !== 'checkbox') { var cb = this.querySelector('input[type=checkbox]'); cb.checked = !cb.checked; cb.dispatchEvent(new Event('change', {bubbles:true})); }">
+      <td><input type="checkbox" name="add_serial" value="{{ a.name }}"></td>
+      <td>{{ a.name }}</td><td>{{ a.classification.department.name }}</td><td>{{ a.classification.name }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="4" class="dash-empty" style="padding:20px;">No matching available assets (or they're already on this or another manifest).</td></tr>
+    {% endfor %}
+  </table>
+  </div>
+  <div class="jm-addbar"><button class="btn btn-primary" type="submit" name="add_serials" value="1">Add selected (<span class="add-count">0</span>)</button></div>
+</form>
+
+{% elif not job.department %}
+<p class="page-sub">Set a Department on this job to browse its equipment by classification — <a data-modal href="{% url 'job_manager:edit' job.pk %}">Edit details</a> — or use the search above.</p>
+
+{% else %}
+<form method="post">
+  {% csrf_token %}
+  {% for group in classification_groups %}
+  <details class="jm-group">
+    <summary>{{ group.classification.name }} <span class="tab-count">{{ group.count }} available</span></summary>
+    <div class="table-wrap" style="border:none; box-shadow:none; margin-top:8px;">
+    <table class="data-table">
+      <tr><th style="width:34px;"></th><th>Asset No / Serial No</th><th>Description</th>{% for fd in group.field_defs %}<th>{{ fd.label }}</th>{% endfor %}</tr>
+      {% for row in group.rows %}
+      <tr class="pickable-row" style="cursor:pointer;" onclick="if (event.target.type !== 'checkbox') { var cb = this.querySelector('input[type=checkbox]'); cb.checked = !cb.checked; cb.dispatchEvent(new Event('change', {bubbles:true})); }">
+        <td><input type="checkbox" name="add_serial" value="{{ row.asset.name }}"></td>
+        <td>{{ row.asset.name }}</td>
+        <td>{{ row.asset.description|default:"—" }}</td>
+        {% for fd in group.field_defs %}<td>{{ row.values|get_item:fd.id|default:"—" }}</td>{% endfor %}
+      </tr>
+      {% empty %}
+      <tr><td colspan="{{ group.field_defs|length|add:3 }}" class="dash-empty" style="padding:16px;">Nothing available in this classification right now.</td></tr>
+      {% endfor %}
+    </table>
+    </div>
+  </details>
+  {% empty %}
+  <p class="page-sub">This department has no classifications set up yet.</p>
+  {% endfor %}
+  {% if classification_groups %}
+  <div class="jm-addbar"><button class="btn btn-primary" type="submit" name="add_serials" value="1">Add selected (<span class="add-count">0</span>)</button></div>
+  {% endif %}
+</form>
+{% endif %}
+<script>
+  document.addEventListener("change", function (e) {
+    if (e.target.name !== "add_serial") return;
+    var n = document.querySelectorAll("input[name=add_serial]:checked").length;
+    document.querySelectorAll(".add-count").forEach(function (el) { el.textContent = n; });
+  });
+</script>
+
+{% else %}
+{# ═════════════ HISTORY ═════════════ #}
+{% if transfers %}
+<div class="table-wrap">
+<table class="data-table">
+  <tr><th>When</th><th>Item</th><th>From</th><th>To</th><th>By</th><th>Reason</th></tr>
+  {% for t in transfers %}
+  <tr>
+    <td style="white-space:nowrap;">{{ t.moved_at|date:"j M Y H:i" }}</td>
+    <td><strong>{{ t.asset_name }}</strong></td>
+    <td>{{ t.from_label }}</td><td>{{ t.to_label }}</td>
+    <td>{{ t.moved_by.username|default:"—" }}</td>
+    <td>{{ t.note|default:"—" }}</td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+{% else %}
+<div class="dash-card"><div class="dash-empty">No transfers yet. When equipment is moved to or from this manifest it is recorded here.</div></div>
+{% endif %}
+{% endif %}
+{% endblock %}

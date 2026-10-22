@@ -1,0 +1,97 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'accounts:backup' %}">Backup</a> / Clean up unused files</p>
+<h1>Clean up unused files</h1>
+<p class="page-sub">When you replace a certificate or delete a record, the portal keeps the old file in storage. These files are not used by any record any more. Moving them out of the way saves storage, and nothing is lost for good right away.</p>
+
+<div class="nc-card" style="max-width:980px; margin-bottom:18px;">
+  <h3 style="margin-top:0;">How this stays safe</h3>
+  <ul class="cell-sub" style="margin:0; padding-left:18px; line-height:1.8;">
+    <li>Files are <b>moved to a trash</b>, not deleted. You can <b>restore</b> them for <b>{{ hold_days }} days</b>; only after that can they be deleted for good.</li>
+    <li>Only files that <b>no record uses</b> are listed, and this is checked again at the moment you click.</li>
+    <li>Files stored in the last <b>{{ grace_hours }} hours</b> are never listed.</li>
+    <li><b>Make a backup first.</b> A backup that included old versions keeps a copy on your disk.</li>
+  </ul>
+</div>
+
+{% if not can_tell %}
+<div class="alert alert-error" style="max-width:980px;">No record points to any file, so the portal cannot tell which files are unused. Nothing is listed, and nothing can be moved.</div>
+{% elif not groups %}
+<div class="alert alert-success" style="max-width:980px;">Nothing to clean up: every stored file is in use (or was stored in the last {{ grace_hours }} hours).</div>
+{% else %}
+<form method="post" action="{% url 'accounts:cleanup_trash' %}" id="cleanup-form" style="max-width:980px;">
+  {% csrf_token %}
+  <p class="page-sub" style="margin:0 0 10px;"><b>{{ total_files }}</b> unused file{{ total_files|pluralize }}, <b>{{ total_bytes|filesizeformat }}</b> in all. Tick what you want to move to the trash.</p>
+  {% for g in groups %}
+  <details class="ac-link" style="margin:0 0 10px; font-size:14px;" {% if groups|length == 1 %}open{% endif %}>
+    <summary>{{ g.folder }} &mdash; {{ g.files|length }} file{{ g.files|length|pluralize }}, {{ g.bytes|filesizeformat }}</summary>
+    <div class="table-wrap" style="margin-top:8px;">
+    <table class="data-table">
+      <tr><th style="width:36px;"><input type="checkbox" class="folder-all" aria-label="Select all in {{ g.folder }}"></th><th>File</th><th>Size</th><th>Stored</th></tr>
+      {% for f in g.files|slice:":500" %}
+      <tr>
+        <td><input type="checkbox" name="name" value="{{ f.name }}" class="file-box"></td>
+        <td style="word-break:break-all;">{{ f.name }}</td>
+        <td style="white-space:nowrap;">{{ f.size|filesizeformat }}</td>
+        <td style="white-space:nowrap;" class="cell-sub">{{ f.modified|date:"j M Y" }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    </div>
+    {% if g.files|length > 500 %}<p class="cell-sub">Showing the first 500 of {{ g.files|length }}. Move these, then reload for the rest.</p>{% endif %}
+  </details>
+  {% endfor %}
+  <button class="btn btn-primary" type="submit" id="cleanup-go" data-confirm="Move the ticked files to the trash? You can restore them for {{ hold_days }} days." disabled>Move ticked files to the trash</button>
+  <span class="cell-sub" id="cleanup-count" style="margin-left:10px;">Nothing ticked.</span>
+</form>
+<script>
+(function () {
+  var form = document.getElementById("cleanup-form"), go = document.getElementById("cleanup-go"), label = document.getElementById("cleanup-count");
+  function refresh() {
+    var boxes = form.querySelectorAll(".file-box:checked");
+    go.disabled = boxes.length === 0;
+    label.textContent = boxes.length ? boxes.length + " ticked." : "Nothing ticked.";
+  }
+  form.addEventListener("change", function (event) {
+    if (event.target.classList.contains("folder-all")) {
+      event.target.closest("table").querySelectorAll(".file-box").forEach(function (box) { box.checked = event.target.checked; });
+    }
+    refresh();
+  });
+  refresh();
+})();
+</script>
+{% endif %}
+
+<h3 style="margin:26px 0 10px;">Trash</h3>
+<div class="table-wrap" style="max-width:980px;">
+<table class="data-table">
+  <tr><th>Moved</th><th>By</th><th>Files</th><th>Size</th><th>Status</th><th></th></tr>
+  {% for b in trash %}
+  <tr>
+    <td>{{ b.created_at|date:"j M Y, H:i" }}</td>
+    <td>{{ b.by.username|default:"—" }}</td>
+    <td>{{ b.count }}</td>
+    <td>{{ b.bytes|filesizeformat }}</td>
+    <td>
+      {% if b.purged_at %}<span class="pill expired">Deleted for good</span>
+      {% elif b.restored_at %}<span class="pill valid">Restored</span>
+      {% elif b.items|length < b.count %}<span class="pill soon">{{ b.items|length }} of {{ b.count }} still in the trash</span>
+      {% elif b.can_purge %}<span class="pill soon">Can be deleted</span>
+      {% else %}<span class="pill">Kept until {{ b.purge_allowed_from|date:"j M Y" }}</span>{% endif %}
+    </td>
+    <td class="actions-cell">
+      {% if b.active %}
+      <form method="post" action="{% url 'accounts:cleanup_restore' b.pk %}">{% csrf_token %}<button class="btn btn-small" type="submit" data-confirm="Put these {{ b.count }} files back where they were?">Restore</button></form>
+      {% if b.can_purge %}
+      <form method="post" action="{% url 'accounts:cleanup_purge' b.pk %}">{% csrf_token %}<button class="btn btn-small" type="submit" data-confirm="Delete these {{ b.count }} files for good? This cannot be undone.">Delete for good</button></form>
+      {% endif %}
+      {% endif %}
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="6"><span class="cell-sub">The trash is empty.</span></td></tr>
+  {% endfor %}
+</table>
+</div>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>{% if incident %}Edit {{ incident.reference }}{% else %}Report an incident{% endif %}</h1>
+  <datalist id="asset-serial-list">{% for s in asset_serials %}<option value="{{ s }}">{% endfor %}</datalist>
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">{% if incident %}Save{% else %}Submit report{% endif %}</button>
+  <a class="btn" href="{% url 'qhse:incident_list' %}">Cancel</a>
+</form>
+{% endblock %}

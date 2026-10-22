@@ -1,0 +1,63 @@
+{% extends "core/base.html" %}
+{% load units %}
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center;">
+  <h1>Wire Management</h1>
+  {% if user.profile.can_edit %}
+  <div style="display:flex; gap:8px;">
+    <a data-modal class="btn" href="{% url 'wire_management:client_manage' %}">Manage clients</a>
+    <a data-modal class="btn" href="{% url 'wire_management:field_well_manage' %}">Manage fields/wells</a>
+    <button type="button" class="btn btn-primary" onclick="document.getElementById('new-drum-modal').showModal()">+ New drum</button>
+  </div>
+  {% endif %}
+</div>
+
+
+<form method="get" class="filter-bar">
+  <input type="text" name="q" placeholder="Search drum number or asset serial..." value="{{ q }}">
+  <button class="btn" type="submit">Search</button>
+</form>
+
+<div class="table-wrap">
+<table class="data-table">
+  <tr><th>Drum Number</th><th>Wire Number</th><th>Diameter</th><th>Manufacturer</th><th>Grade</th><th>Total Length (ft / m)</th><th>Remaining (ft / m)</th><th></th></tr>
+  {% for d in drums %}
+  <tr>
+    <td><a href="{% url 'wire_management:detail' d.pk %}">{{ d.drum_number }}</a></td>
+    <td>{{ d.wire_number }}</td>
+    <td>{{ d.diameter }}</td>
+    <td>{{ d.manufacturer|default:"—" }}</td>
+    <td>{{ d.grade|default:"—" }}</td>
+    <td>{{ d.total_length_ft|ft_m }}</td>
+    <td>
+      {{ d.remaining_length_ft|ft_m }}
+      <span class="pill {% if d.percent_remaining <= 10 %}expired{% elif d.percent_remaining <= 25 %}soon{% else %}valid{% endif %}">{{ d.percent_remaining }}%</span>
+    </td>
+    <td>
+      {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'wire_management:edit' d.pk %}">Edit</a>{% endif %}
+      {% if user.profile.can_delete %}<a class="btn" href="{% url 'wire_management:delete' d.pk %}" data-confirm="Delete this drum and its entire log history?">Delete</a>{% endif %}
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="8">No drums yet.</td></tr>
+  {% endfor %}
+</table>
+</div>
+
+{% if user.profile.can_edit %}
+<dialog id="new-drum-modal" style="border:none; border-radius:12px; padding:0; width:min(90vw, 520px);">
+  <form method="post" style="padding:24px; max-height:80vh; overflow-y:auto;">
+    {% csrf_token %}
+    <h2 style="margin-top:0;">New drum</h2>
+    {{ form.as_p }}
+    <div style="margin-top:16px; display:flex; gap:8px;">
+      <button class="btn btn-primary" type="submit">Add drum</button>
+      <button class="btn" type="button" onclick="document.getElementById('new-drum-modal').close()">Cancel</button>
+    </div>
+  </form>
+</dialog>
+{% if form.errors %}
+<script>document.addEventListener("DOMContentLoaded", function() { document.getElementById('new-drum-modal').showModal(); });</script>
+{% endif %}
+{% endif %}
+{% endblock %}

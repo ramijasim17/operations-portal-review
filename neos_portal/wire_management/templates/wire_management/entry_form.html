@@ -1,0 +1,31 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'wire_management:detail' entry.drum_id %}">{{ entry.drum.drum_number }}</a> / Edit log entry</p>
+<h1>Edit log entry — {{ entry.date }}</h1>
+<form method="post" enctype="multipart/form-data" style="max-width:600px;">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <label class="page-sub" style="display:block; margin-top:10px;">Add more evidence files</label>
+  <input type="file" name="files" multiple>
+  <div style="margin-top:16px;">
+    <button class="btn btn-primary" type="submit">Save</button>
+    <a class="btn" href="{% url 'wire_management:detail' entry.drum_id %}">Cancel</a>
+  </div>
+</form>
+
+{% if evidence_files %}
+<h3 style="margin-top:24px;">Existing evidence</h3>
+<div class="table-wrap" style="max-width:600px;">
+<table class="data-table">
+  <tr><th>File</th><th>Uploaded</th><th></th></tr>
+  {% for ev in evidence_files %}
+  <tr>
+    <td>{% if user.profile.can_download %}<a href="{{ ev.file.url }}" target="_blank">{{ ev.file.name|slice:"-40:" }}</a>{% else %}{{ ev.file.name|slice:"-40:" }}{% endif %}</td>
+    <td>{{ ev.uploaded_at|date:"d M Y H:i" }}</td>
+    <td>{% if user.profile.can_delete %}<a class="btn" href="{% url 'wire_management:evidence_delete' ev.pk %}" data-confirm="Delete this evidence file?">Delete</a>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+{% endif %}
+{% endblock %}

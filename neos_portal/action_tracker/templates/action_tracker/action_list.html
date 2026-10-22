@@ -1,0 +1,99 @@
+{% extends "core/base.html" %}
+{% load dept %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Action Tracker</h1>
+    <p class="page-sub">Follow-ups and to-dos &mdash; the most urgent open actions are always at the top.</p>
+  </div>
+  <div class="page-head-actions">
+    <a class="btn" href="{% url 'action_tracker:insights' %}">Insights</a>
+    {% if user.profile.can_edit %}<a data-modal class="btn btn-primary" href="{% url 'action_tracker:create' %}">+ New action</a>{% endif %}
+  </div>
+</div>
+
+<div class="dept-bar">{% dept_scope %}</div>
+
+<div class="stat-strip">
+  <div class="stat"><div class="stat-value">{{ counts.open }}</div><div class="stat-label">open</div></div>
+  <div class="stat {% if counts.overdue %}stat-bad{% else %}stat-good{% endif %}"><div class="stat-value">{{ counts.overdue }}</div><div class="stat-label">overdue</div></div>
+  <div class="stat {% if counts.high_open %}stat-warn{% else %}stat-muted{% endif %}"><div class="stat-value">{{ counts.high_open }}</div><div class="stat-label">high priority · open</div></div>
+  <div class="stat stat-good"><div class="stat-value">{{ counts.completed }}</div><div class="stat-label">completed</div></div>
+</div>
+
+<div class="tabs-row">
+  <a href="?tab=open" class="tab-box {% if tab == 'open' %}active{% endif %}">Open <span class="tab-count">{{ counts.open }}</span></a>
+  <a href="?tab=overdue" class="tab-box {% if tab == 'overdue' %}active{% endif %}">Overdue <span class="tab-count">{{ counts.overdue }}</span></a>
+  <a href="?tab=completed" class="tab-box {% if tab == 'completed' %}active{% endif %}">Completed <span class="tab-count">{{ counts.completed }}</span></a>
+  <a href="?tab=all" class="tab-box {% if tab == 'all' %}active{% endif %}">All <span class="tab-count">{{ counts.all }}</span></a>
+</div>
+
+<form method="get" class="toolbar">
+  <input type="hidden" name="tab" value="{{ tab }}">
+  <input type="search" name="q" placeholder="Search action or assignee…" value="{{ q }}">
+  <select name="priority" onchange="this.form.submit()">
+    <option value="">All priorities</option>
+    <option value="High" {% if priority == "High" %}selected{% endif %}>High</option>
+    <option value="Medium" {% if priority == "Medium" %}selected{% endif %}>Medium</option>
+    <option value="Low" {% if priority == "Low" %}selected{% endif %}>Low</option>
+  </select>
+  <select name="assignee" onchange="this.form.submit()">
+    <option value="">Everyone</option>
+    {% for name in assignees %}<option value="{{ name }}" {% if assignee == name %}selected{% endif %}>{{ name }}</option>{% endfor %}
+  </select>
+  <button class="btn" type="submit">Search</button>
+  {% if q or priority or assignee %}<a class="btn" href="?tab={{ tab }}">Clear</a>{% endif %}
+</form>
+
+<div class="table-wrap">
+<table class="data-table">
+  <thead><tr><th style="width:44px;"></th><th>Action</th><th>Priority</th><th>Assigned to</th><th>Due</th><th>Progress</th><th></th></tr></thead>
+  <tbody>
+    {% for a in actions %}
+    <tr {% if not a.is_open %}style="opacity:.62;"{% endif %}>
+      <td>
+        {% if user.profile.can_edit %}
+        <form method="post" action="{% url 'action_tracker:set_status' a.pk %}" data-noconfirm>
+          {% csrf_token %}
+          <button type="submit" class="tick {% if not a.is_open %}is-done{% endif %}" title="{% if a.is_open %}Mark done{% else %}Reopen{% endif %}">{% if not a.is_open %}&#10003;{% endif %}</button>
+        </form>
+        {% else %}<span class="tick {% if not a.is_open %}is-done{% endif %}">{% if not a.is_open %}&#10003;{% endif %}</span>{% endif %}
+      </td>
+      <td>
+        <div class="cell-title"><a href="{% url 'action_tracker:detail' a.pk %}" {% if not a.is_open %}style="text-decoration:line-through;"{% endif %}>{{ a.action_item }}</a></div>
+        {% if a.client or a.action_type or a.department %}<div class="cell-sub">{% if scope.mode == 'all' and a.department %}{{ a.department.name }} &middot; {% endif %}{{ a.client }}{% if a.client and a.action_type %} &middot; {% endif %}{{ a.get_action_type_display }}</div>{% endif %}
+        {% if a.comments %}<div class="cell-sub">{{ a.comments|truncatechars:70 }}</div>{% endif %}
+      </td>
+      <td><span class="pill {% if a.priority == 'High' %}expired{% elif a.priority == 'Medium' %}soon{% endif %}">{{ a.priority }}</span></td>
+      <td>{{ a.assignee|default:"—" }}</td>
+      <td>
+        {% if a.due_date %}
+          <span class="pill {{ a.due_state }}">{% if not a.is_open %}{{ a.due_date|date:"d M" }}{% elif a.days_left < 0 %}{{ a.days_left|cut:"-" }} day{{ a.days_left|cut:"-"|pluralize }} overdue{% elif a.days_left == 0 %}today{% else %}in {{ a.days_left }} day{{ a.days_left|pluralize }}{% endif %}</span>
+          <div class="cell-sub">{{ a.due_date|date:"d M Y" }}</div>
+        {% else %}<span class="cell-sub">no due date</span>{% endif %}
+      </td>
+      <td>
+        {% if a.step_total %}
+        <div class="progress"><div class="progress-track"><div class="progress-fill {% if a.step_done == a.step_total %}is-done{% endif %}" style="width:{{ a.step_percent }}%;"></div></div><span class="progress-text">{{ a.step_done }}/{{ a.step_total }}</span></div>
+        {% else %}<span class="pill {% if a.status == 'In Progress' %}soon{% elif a.status == 'Completed' %}valid{% endif %}">{{ a.status }}</span>{% endif %}
+      </td>
+      <td class="actions-cell">
+        <a class="btn" href="{% url 'action_tracker:detail' a.pk %}">Open</a>
+        {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'action_tracker:edit' a.pk %}">Edit</a>{% endif %}
+        {% if user.profile.can_delete %}<form method="post" action="{% url 'action_tracker:delete' a.pk %}">{% csrf_token %}<button class="btn" type="submit" data-confirm="Delete this action?">Delete</button></form>{% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7" class="dash-empty" style="padding:24px;">{% if q or priority or assignee %}No actions match those filters.{% elif tab == 'overdue' %}Nothing is overdue.{% elif tab == 'completed' %}Nothing completed yet.{% else %}No actions here yet.{% endif %}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if counts.completed and tab == 'completed' %}
+{% if user.profile.can_delete %}<form method="post" action="{% url 'action_tracker:clear_completed' %}" style="margin-top:14px;">
+  {% csrf_token %}
+  <button class="btn" type="submit" data-confirm="Permanently delete all completed actions? They will also disappear from the Insights figures.">Clear completed actions</button>
+</form>{% endif %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Delete {{ department.name }}?</h1>
+<p class="page-sub">This will delete all classifications, assets, and certificates under this department.</p>
+<form method="post">
+  {% csrf_token %}
+  <button class="btn btn-primary" type="submit">Delete</button>
+  <a class="btn" href="{% url 'departments:list' %}">Cancel</a>
+</form>
+{% endblock %}

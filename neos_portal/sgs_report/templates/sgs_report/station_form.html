@@ -1,0 +1,11 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub crumbs"><a href="/sgs-report/{{ station.report_id }}/?tab=result">Back to report</a></p>
+<h1>Edit station {{ station.step_no }}</h1>
+<form method="post" style="max-width:400px;">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn btn-primary" type="submit">Save</button>
+  <a class="btn" href="/sgs-report/{{ station.report_id }}/?tab=result">Cancel</a>
+</form>
+{% endblock %}

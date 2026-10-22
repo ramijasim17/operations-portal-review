@@ -1,0 +1,54 @@
+{% extends "core/base.html" %}
+{% block content %}
+<p class="page-sub">
+  <a href="{% url 'departments:list' %}">Departments</a> /
+  <a href="{% url 'departments:detail' classification.department.pk %}">{{ classification.department.name }}</a> /
+  <a href="{% url 'departments:classification_detail' classification.pk %}">{{ classification.name }}</a> /
+  {% if asset %}Edit {{ asset.name }}{% else %}New asset{% endif %}
+</p>
+
+<h1>{% if asset %}Edit{% else %}New{% endif %} asset — {{ classification.name }}</h1>
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+
+  <div style="margin-bottom:12px;">
+    <label>{{ form.name.label }}</label><br>
+    {{ form.name }}
+    {% if form.name.errors %}<div class="alert alert-error">{{ form.name.errors }}</div>{% endif %}
+  </div>
+
+  <div style="margin-bottom:12px;">
+    <label>{{ form.description.label }}</label><br>
+    {{ form.description }}
+    {% if form.description.errors %}<div class="alert alert-error">{{ form.description.errors }}</div>{% endif %}
+  </div>
+
+  {% for row in rows %}
+    {% if row.value_field %}
+      <div style="margin-bottom:12px;">
+        <label>{{ row.fd.label }}</label><br>
+        <div style="display:flex; gap:8px;">
+          {{ row.value_field }}
+          {{ row.unit_field }}
+        </div>
+        {% if row.value_field.errors %}<div class="alert alert-error">{{ row.value_field.errors }}</div>{% endif %}
+        {% if row.unit_field.errors %}<div class="alert alert-error">{{ row.unit_field.errors }}</div>{% endif %}
+      </div>
+    {% else %}
+      <div style="margin-bottom:12px;">
+        <label>{{ row.field.label }}</label><br>
+        {{ row.field }}
+        {% if row.datalist_id %}
+        <datalist id="{{ row.datalist_id }}">
+          {% for opt in row.options %}<option value="{{ opt }}">{% endfor %}
+        </datalist>
+        {% endif %}
+        {% if row.field.errors %}<div class="alert alert-error">{{ row.field.errors }}</div>{% endif %}
+      </div>
+    {% endif %}
+  {% endfor %}
+
+  <button class="btn btn-primary" type="submit">Save</button>
+  <a class="btn" href="{% url 'departments:classification_detail' classification.pk %}">Cancel</a>
+</form>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "core/base_unauthenticated.html" %}
+{% block content %}
+<div class="auth-card">
+  <h1>Check your email</h1>
+  <p class="auth-sub">We sent a 6-digit code to {{ email }}. Enter it below to activate your account.</p>
+  <form method="post">
+    {% csrf_token %}
+    <label for="id_code">Verification code</label>
+    {{ form.code }}
+    {% if form.code.errors %}<div class="alert alert-error">{{ form.code.errors }}</div>{% endif %}
+    <button type="submit" class="btn btn-primary btn-block">Verify</button>
+  </form>
+  <form method="post" action="{% url 'accounts:resend_code' %}">
+    {% csrf_token %}
+    <button type="submit" class="auth-link" style="background:none; border:none; cursor:pointer; text-decoration:underline;">Didn't get a code? Send another</button>
+  </form>
+</div>
+{% endblock %}

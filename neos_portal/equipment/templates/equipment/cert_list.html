@@ -1,0 +1,44 @@
+{% extends "core/base.html" %}
+{% block content %}
+<h1>Equipment Certificates</h1>
+
+<div class="nc-stats">
+  <div class="nc-stat"><div class="lbl">Certificate records</div><div class="val">{{ total }}</div></div>
+  <div class="nc-stat expired"><div class="lbl">Expired / missing</div><div class="val">{{ counts.expired|add:counts.missing }}</div></div>
+  <div class="nc-stat soon"><div class="lbl">Expiring &lt; 30 days</div><div class="val">{{ counts.soon }}</div></div>
+  <div class="nc-stat valid"><div class="lbl">Valid</div><div class="val">{{ counts.valid }}</div></div>
+</div>
+
+<form method="get" style="display:flex; gap:8px; margin-bottom:16px;">
+  <input type="text" name="q" placeholder="Search serial number…" value="{{ request.GET.q }}">
+  <select name="status">
+    <option value="">All statuses</option>
+    <option value="expired">Expired</option>
+    <option value="soon">Expiring soon</option>
+    <option value="valid">Valid</option>
+    <option value="missing">Missing</option>
+  </select>
+  <button class="btn" type="submit">Filter</button>
+</form>
+
+<table class="data-table">
+  <thead>
+    <tr><th>Serial Number</th><th>Category</th><th>Cert Type</th><th>Status</th><th>Expiry Date</th><th>File</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for cert in rows %}
+    <tr>
+      <td>{{ cert.equipment.serial_number }}</td>
+      <td>{{ cert.equipment.category }}</td>
+      <td>{{ cert.cert_type.name }}</td>
+      <td><span class="pill {{ cert.status }}">{{ cert.get_status_display|default:cert.status }}</span></td>
+      <td>{{ cert.expiry_date|default:"—" }}</td>
+      <td>{% if cert.file %}{% if user.profile.can_download %}<a href="{{ cert.file.url }}" target="_blank">Open</a>{% else %}<span class="page-sub">Restricted</span>{% endif %}{% else %}—{% endif %}</td>
+      <td>{% if user.profile.can_edit %}<a href="{% url 'equipment:cert_edit' cert.id %}">Manage</a>{% endif %}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7">No records match the current filters.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

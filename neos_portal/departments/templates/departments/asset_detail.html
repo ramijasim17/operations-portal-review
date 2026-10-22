@@ -1,0 +1,77 @@
+{% extends "core/base.html" %}
+{% block title %}{{ asset.name }} · Departments{% endblock %}
+{% block content %}
+<p class="page-sub crumbs"><a href="{% url 'departments:list' %}">Departments</a> / <a href="{% url 'departments:classification_detail' asset.classification.pk %}">{{ asset.classification.name }}</a> / {{ asset.name }}</p>
+<div class="page-head">
+  <div>
+    <h1>{{ asset.name }}</h1>
+    <p class="page-sub">{{ asset.description }} &middot; {{ asset.classification.department.name }} &middot; <span class="loc-pill {% if asset.current_location == 'Workshop' %}loc-workshop{% else %}loc-away{% endif %}">{{ asset.current_location }}</span></p>
+  </div>
+  <div class="page-head-actions">
+    {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'departments:asset_edit' asset.pk %}">Edit asset</a>{% endif %}
+  </div>
+</div>
+
+<div class="stat-strip">
+  <div class="stat {% if overdue_jobs %}stat-bad{% else %}stat-good{% endif %}"><div class="stat-value">{{ jobs|length }}</div><div class="stat-label">maintenance jobs{% if overdue_jobs %} &middot; {{ overdue_jobs }} overdue{% endif %}</div></div>
+  <div class="stat {% if incidents %}stat-warn{% else %}stat-good{% endif %}"><div class="stat-value">{{ incidents|length }}</div><div class="stat-label">QHSE incidents</div></div>
+  <div class="stat stat-muted"><div class="stat-value">{{ inspections|length }}</div><div class="stat-label">QHSE inspections</div></div>
+  <div class="stat {% if open_actions %}stat-warn{% else %}stat-good{% endif %}"><div class="stat-value">{{ open_actions }}</div><div class="stat-label">open actions</div></div>
+</div>
+
+<div class="dash-row dash-row-2">
+  <div class="dash-card">
+    <h3>Maintenance <a class="cell-sub" style="margin-left:8px;" href="{% url 'maintenance:list' %}?q={{ asset.name|urlencode }}">open in Maintenance</a></h3>
+    {% for j in jobs %}
+    <div style="display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-top:1px solid var(--border);">
+      <div class="cell-title"><a href="{% url 'maintenance:history' j.pk %}">{{ j.get_activity_display }} &middot; {{ j.schedule_text }}</a>
+        <div class="cell-sub">last done {{ j.last_done|date:"j M Y"|default:"never" }}{% if j.last_result %} ({{ j.last_result }}){% endif %}{% if j.due_date %} &middot; next due {{ j.due_date|date:"j M Y" }}{% endif %}</div></div>
+      <span class="pill {{ j.status }}" style="align-self:flex-start;">{% if j.status == 'expired' %}Overdue{% elif j.status == 'soon' %}Due soon{% elif j.status == 'valid' %}On schedule{% elif j.status == 'standby' %}Standby{% elif j.status == 'done' %}Finished{% else %}No date{% endif %}</span>
+    </div>
+    {% empty %}<div class="dash-empty">No maintenance jobs for this equipment.</div>{% endfor %}
+  </div>
+  <div class="dash-card">
+    <h3>Certificates</h3>
+    {% for c in certs %}
+    <div style="display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-top:1px solid var(--border);">
+      <div class="cell-title">{{ c.cert_type.name }}<div class="cell-sub">{% if c.expiry_date %}expires {{ c.expiry_date|date:"j M Y" }}{% else %}no expiry date{% endif %}</div></div>
+      <span class="pill {{ c.status }}" style="align-self:flex-start;">{% if c.status == 'expired' %}Expired{% elif c.status == 'soon' %}Expiring{% elif c.status == 'valid' %}Valid{% elif c.status == 'na' %}N/A{% else %}Missing{% endif %}</span>
+    </div>
+    {% empty %}<div class="dash-empty">No certificates recorded.</div>{% endfor %}
+  </div>
+</div>
+
+<div class="dash-row dash-row-2">
+  <div class="dash-card">
+    <h3>QHSE incidents <a class="cell-sub" style="margin-left:8px;" href="{% url 'qhse:incident_list' %}?tab=all&q={{ asset.name|urlencode }}">all</a></h3>
+    {% for i in incidents %}
+    <div style="display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-top:1px solid var(--border);">
+      <div class="cell-title"><a href="{% url 'qhse:incident_detail' i.pk %}">{{ i.reference }} &middot; {{ i.title }}</a>
+        <div class="cell-sub">{{ i.get_incident_type_display }} &middot; {{ i.date|date:"j M Y" }} &middot; {{ i.status }}</div></div>
+      <span class="pill {{ i.severity_pill }}" style="align-self:flex-start;">{{ i.severity }}</span>
+    </div>
+    {% empty %}<div class="dash-empty">No incidents linked to this equipment.</div>{% endfor %}
+  </div>
+  <div class="dash-card">
+    <h3>QHSE inspections</h3>
+    {% for i in inspections %}
+    <div style="display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-top:1px solid var(--border);">
+      <div class="cell-title"><a href="{% url 'qhse:inspection_detail' i.pk %}">{{ i.reference }} &middot; {{ i.title }}</a>
+        <div class="cell-sub">{{ i.get_kind_display }} &middot; {% if i.is_done %}done {{ i.done_date|date:"j M Y" }}{% else %}due {{ i.due_date|date:"j M Y" }}{% endif %}</div></div>
+      {% if i.result %}<span class="pill {{ i.result_pill }}" style="align-self:flex-start;">{{ i.result }}</span>{% else %}<span class="pill {{ i.status_pill }}" style="align-self:flex-start;">{{ i.status_text }}</span>{% endif %}
+    </div>
+    {% empty %}<div class="dash-empty">No inspections linked to this equipment.</div>{% endfor %}
+  </div>
+</div>
+
+<div class="dash-card">
+  <h3>Actions from all of the above <span class="dash-count">{{ actions|length }}</span></h3>
+  {% for a in actions %}
+  <div style="display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-top:1px solid var(--border);">
+    <div class="cell-title"><a href="{% url 'action_tracker:detail' a.pk %}">{{ a.action_item }}</a>
+      <div class="cell-sub">{{ a.assignee|default:"unassigned" }}{% if a.due_date %} &middot; due {{ a.due_date|date:"j M Y" }}{% endif %}</div></div>
+    <span class="pill {% if not a.is_open %}valid{% elif a.is_overdue %}expired{% elif a.status == 'In Progress' %}soon{% endif %}" style="align-self:flex-start;">{% if a.is_overdue %}Overdue{% else %}{{ a.status }}{% endif %}</span>
+  </div>
+  {% empty %}<div class="dash-empty">No actions yet.</div>{% endfor %}
+</div>
+{% endblock %}

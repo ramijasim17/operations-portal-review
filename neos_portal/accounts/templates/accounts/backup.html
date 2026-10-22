@@ -1,0 +1,280 @@
+{% extends "core/base.html" %}
+{% load static %}
+{% block content %}
+<h1>Backup</h1>
+<p class="page-sub">Keep a copy of the portal on an external disk. One button brings it up to date.</p>
+
+<div class="nc-card" id="sync-card" style="max-width:980px;"
+     data-manifest="{% url 'accounts:backup_sync_manifest' %}" data-file="{% url 'accounts:backup_sync_file' %}"
+     data-database="{% url 'accounts:backup_sync_database' %}" data-code="{% url 'accounts:backup_sync_code' %}"
+     data-done="{% url 'accounts:backup_sync_done' %}">
+  <h3 style="margin-top:0;">Update my backup folder</h3>
+  <p class="page-sub" style="margin:0 0 12px;">Choose a folder on your external disk once. Each time you click <b>Update</b>, the portal looks at what is already in that folder and saves <b>only what is new or changed</b>, straight into it. Files that were deleted in the portal are moved to a <code>_removed</code> folder, not thrown away. The first time copies everything; after that it takes seconds.</p>
+
+  <div id="sync-unsupported" class="alert alert-error" style="display:none;">This needs <b>Chrome</b> or <b>Edge</b> on a computer. Safari, Firefox and phones cannot save into a folder. Open the portal in Chrome, or use the zip backups under <i>Advanced</i> below.</div>
+
+  <div id="sync-controls">
+    <div class="cell-sub" id="sync-folder" style="margin:0 0 10px;">No folder chosen yet.</div>
+    <label class="cell-sub" style="display:flex; gap:8px; align-items:flex-start; margin:0 0 12px; cursor:pointer;">
+      <input type="checkbox" id="sync-old" style="margin-top:3px;">
+      <span><b>Also keep old versions</b> in a separate <code>_old_versions</code> folder: files the portal no longer uses, such as the previous file of a certificate you replaced. Leave this off and the backup holds only what the portal uses <b>now</b>.</span>
+    </label>
+    <button class="btn btn-primary" type="button" id="sync-go">Choose backup folder and update</button>
+    <button class="btn" type="button" id="sync-change" style="display:none;">Use a different folder</button>
+    <button class="btn" type="button" id="sync-cancel" style="display:none;">Cancel</button>
+  </div>
+
+  <div id="sync-progress" style="display:none; margin-top:14px;">
+    <div class="progress"><div class="progress-track"><div class="progress-fill" id="sync-bar" style="width:0%;"></div></div><span class="progress-text" id="sync-percent">0%</span></div>
+    <div class="cell-sub" id="sync-status" style="margin-top:8px;"></div>
+  </div>
+  <div id="sync-result" style="margin-top:12px;"></div>
+
+  {% if last_sync %}
+  <p class="cell-sub" style="margin:14px 0 0;">Last update: <b>{{ last_sync.started_at|date:"j M Y, H:i" }}</b> by {{ last_sync.by.username|default:"—" }} &mdash; {{ last_sync.files_included }} file{{ last_sync.files_included|pluralize }} saved ({{ last_sync.files_bytes|filesizeformat }}), {{ last_sync.files_in_storage }} in the portal.</p>
+  {% endif %}
+  <p class="cell-sub" style="margin:10px 0 0;">Tips: pick a <b>folder on the disk</b> (for example <code>ABC-Web-Portal</code>), not the disk itself; Chrome does not allow that. Keep the portal page open until it says <i>Finished</i>. The disk should be formatted <b>exFAT</b> or <b>APFS</b>; the old FAT32 format cannot hold large files.</p>
+</div>
+
+<p class="cell-sub" style="margin:14px 0 0; max-width:980px;">Storage full of old files? <a href="{% url 'accounts:cleanup' %}">Clean up unused files</a> &mdash; moved to a trash first, so nothing is lost for good right away.</p>
+
+<details class="ac-link" style="margin-top:22px; max-width:980px;">
+  <summary>Advanced: zip backups</summary>
+  <div style="margin-top:14px;">
+<div class="dash-row dash-row-2" style="max-width:980px;">
+  <div class="dash-card">
+    <h3 style="margin-top:0;">Only what changed</h3>
+    {% if last %}
+      <form method="get" action="{% url 'accounts:backup_download' %}" id="changes-form">
+        <input type="hidden" name="mode" value="changes">
+        <label for="base-select" class="page-sub" style="display:block; margin:0 0 6px;">Which is the <b>latest backup you already have</b> on your disk?</label>
+        <select name="base" id="base-select" data-preview="{% url 'accounts:backup_preview' %}" style="width:100%; margin-bottom:12px;">
+          {% for b in history %}<option value="{{ b.pk }}">{{ b.label }} &mdash; {{ b.get_kind_display }}, {{ b.started_at|date:"j M Y, H:i" }}</option>{% endfor %}
+        </select>
+        <ul class="cell-sub" id="changes-preview" style="margin:0 0 14px; padding-left:18px; line-height:1.7;">
+          <li><b>{{ preview.files_changed }}</b> new or changed file{{ preview.files_changed|pluralize }} ({{ preview.files_changed_bytes|filesizeformat }})</li>
+          <li>the <b>database</b>, always complete (it is small)</li>
+          <li>the <b>code</b>: {% if preview.code_changed %}changed, so it is included{% else %}unchanged, so it is left out{% endif %}</li>
+        </ul>
+        <button class="btn btn-primary" type="submit" data-noconfirm>Download changes only</button>
+      </form>
+      <p class="cell-sub" style="margin:10px 0 0;">Look at the file names on your disk: <code>abc-backup-full-<b>20261009-0001</b>.zip</code>. The part in bold is what the list shows.</p>
+    {% else %}
+      <p class="page-sub" style="margin:0;">There is no earlier backup yet. Make a <b>full backup</b> first; after that you can download only what is new or changed since a backup you pick.</p>
+    {% endif %}
+  </div>
+  <div class="dash-card">
+    <h3 style="margin-top:0;">Full backup</h3>
+    <p class="page-sub" style="margin:0 0 12px;">Everything in one zip: the <b>database</b>, all <b>{{ info.files_count }} uploaded file{{ info.files_count|pluralize }}</b> ({{ info.files_bytes|filesizeformat }}) and the <b>code</b>, with a README that says how to restore. Make one first, and again now and then.</p>
+    <a class="btn {% if not last %}btn-primary{% endif %}" href="{% url 'accounts:backup_download' %}?mode=full" data-noconfirm>Download full backup</a>
+  </div>
+</div>
+<p class="cell-sub" style="margin:10px 0 0;">The zip is built as it downloads, so a big one can take a few minutes. Keep this page open until the browser says it has finished. A backup only counts once its download has finished.</p>
+
+<div class="nc-card" style="margin-top:18px; max-width:980px;">
+  <h3 style="margin-top:0;">Make the changes part of your old backup</h3>
+  <p class="page-sub" style="margin:4px 0;">Once you have a changes-only file, this command (run on your Mac, in the portal folder) applies it on top of your old backup and writes <b>one updated full backup</b>. New and changed files are put in, deleted files are taken out, and the newest database and code are used. It checks the result before it finishes.</p>
+  <p class="page-sub" style="margin:4px 0;"><code>venv/bin/python manage.py merge_backup "OLD-full-backup.zip" "NEW-changes-file.zip" --output "UPDATED-full-backup.zip"</code></p>
+  <p class="page-sub" style="margin:4px 0;">Add more changes files in date order if you have several. Add <code>--replace</code> instead of <code>--output</code> to overwrite the old backup with the updated one, once it has been checked.</p>
+</div>
+
+<h3 style="margin:26px 0 10px;">Recent backups</h3>
+<div class="table-wrap" style="max-width:980px;">
+<table class="data-table">
+  <tr><th>File stamp</th><th>When</th><th>Kind</th><th>By</th><th>Files in it</th><th>Size</th><th>Code</th></tr>
+  {% for b in history %}
+  <tr>
+    <td class="cell-title"><code>{{ b.label }}</code></td>
+    <td>{{ b.started_at|date:"j M Y, H:i" }}</td>
+    <td><span class="pill {% if b.kind == 'full' %}valid{% endif %}">{{ b.get_kind_display }}</span>{% if b.based_on %}<div class="cell-sub">on top of {{ b.based_on.label }}</div>{% endif %}</td>
+    <td>{{ b.by.username|default:"—" }}</td>
+    <td>{{ b.files_included }} of {{ b.files_in_storage }} <span class="cell-sub">({{ b.files_bytes|filesizeformat }})</span></td>
+    <td>{{ b.zip_bytes|filesizeformat }}</td>
+    <td>{% if b.code_included %}included{% else %}<span class="cell-sub">unchanged</span>{% endif %}</td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="7"><span class="cell-sub">No backups yet.</span></td></tr>
+  {% endfor %}
+</table>
+</div>
+
+<div class="nc-card" style="margin-top:18px; max-width:980px;">
+  <h3 style="margin-top:0;">Saving it onto an external hard disk</h3>
+  <p class="page-sub" style="margin:4px 0;">1. Plug in the disk.</p>
+  <p class="page-sub" style="margin:4px 0;">2. Make your browser ask where to save: in <b>Chrome</b>, Settings &rarr; Downloads &rarr; <i>Ask where to save each file before downloading</i>. In <b>Safari</b>, Settings &rarr; General &rarr; <i>File download location</i> &rarr; Ask for each download.</p>
+  <p class="page-sub" style="margin:4px 0;">3. Click a download button and choose the disk when the browser asks.</p>
+  <p class="page-sub" style="margin:4px 0;"><b>Use one disk for the chain:</b> the portal measures &ldquo;changes&rdquo; from the last backup it recorded, whichever disk it went to. To keep a second disk, make a <b>full</b> backup onto it. To restore, start from the last full backup, add each changes-only backup in date order, and use the newest <code>database.json</code>.</p>
+  <p class="page-sub" style="margin:4px 0;"><b>Check it afterwards.</b> Open the zip once, or run this on your Mac, which reads every file back and compares the checksums:</p>
+  <p class="page-sub" style="margin:4px 0;"><code>venv/bin/python manage.py verify_backup "/Volumes/YourDisk/abc-backup-full-….zip"</code></p>
+  <p class="page-sub" style="margin:4px 0;">The portal runs on a server in the cloud and cannot see your disk, so the browser does the saving. Keep the disk somewhere safe.</p>
+</div>
+
+<details class="ac-link" style="margin-top:14px; max-width:980px;">
+  <summary>Single parts</summary>
+  <p class="cell-sub" style="margin:8px 0;">These download one part only and are <b>not</b> recorded as a backup.</p>
+  <a class="btn btn-small" href="{% url 'accounts:backup_download' %}?part=database">Database</a>
+  <a class="btn btn-small" href="{% url 'accounts:backup_download' %}?part=files">Files</a>
+  <a class="btn btn-small" href="{% url 'accounts:backup_download' %}?part=code">Code ({{ info.code_count }} files)</a>
+</details>
+<script>
+(function () {
+  var select = document.getElementById("base-select");
+  if (!select) return;
+  var list = document.getElementById("changes-preview");
+  function show(data) {
+    var size = data.files_changed_bytes > 1048576 ? (data.files_changed_bytes / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(data.files_changed_bytes / 1024)) + " KB";
+    list.innerHTML = "<li><b>" + data.files_changed + "</b> new or changed file" + (data.files_changed === 1 ? "" : "s") + " (" + size + ")</li>" +
+      "<li>the <b>database</b>, always complete (it is small)</li>" +
+      "<li>the <b>code</b>: " + (data.code_changed ? "changed, so it is included" : "unchanged, so it is left out") + "</li>";
+  }
+  select.addEventListener("change", function () {
+    fetch(select.dataset.preview + "?base=" + encodeURIComponent(select.value), {headers: {"X-Requested-With": "fetch"}})
+      .then(function (r) { return r.json(); }).then(show).catch(function () {});
+  });
+})();
+</script>
+
+  </div>
+</details>
+
+<script src="{% static 'core/js/backup_sync.js' %}?v={{ asset_version }}"></script>
+<script>
+(function () {
+  var card = document.getElementById("sync-card");
+  var Sync = window.NeosBackupSync;
+  var $ = function (id) { return document.getElementById(id); };
+  if (!("showDirectoryPicker" in window)) {
+    $("sync-unsupported").style.display = "";
+    $("sync-go").disabled = true;
+    return;
+  }
+
+  // ── remember the chosen folder between visits ──
+  function openDb() {
+    return new Promise(function (resolve, reject) {
+      var request = indexedDB.open("abc-backup", 1);
+      request.onupgradeneeded = function () { request.result.createObjectStore("handles"); };
+      request.onsuccess = function () { resolve(request.result); };
+      request.onerror = function () { reject(request.error); };
+    });
+  }
+  function stored(mode, work) {
+    return openDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction("handles", mode), result = work(tx.objectStore("handles"));
+        tx.oncomplete = function () { resolve(result && result.result); };
+        tx.onerror = function () { reject(tx.error); };
+      });
+    });
+  }
+  var getFolder = function () { return stored("readonly", function (s) { return s.get("folder"); }).catch(function () { return null; }); };
+  var setFolder = function (handle) { return stored("readwrite", function (s) { return s.put(handle, "folder"); }); };
+
+  var folder = null, controller = null, running = false;
+  try { $("sync-old").checked = localStorage.getItem("abc-backup-old") === "1"; } catch (e) { /* private window */ }
+  $("sync-old").addEventListener("change", function () { try { localStorage.setItem("abc-backup-old", $("sync-old").checked ? "1" : "0"); } catch (e) { /* ignore */ } });
+
+  function human(bytes) {
+    if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + " GB";
+    if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + " MB";
+    return Math.max(1, Math.round(bytes / 1024)) + " KB";
+  }
+  function csrf() { var i = document.querySelector("#post-link-form input[name=csrfmiddlewaretoken]"); return i ? i.value : ""; }
+  function show(label) {
+    $("sync-folder").innerHTML = folder ? "Backup folder: <b></b>" : "No folder chosen yet.";
+    if (folder) $("sync-folder").querySelector("b").textContent = folder.name;
+    $("sync-go").textContent = label || (folder ? "Update backup" : "Choose backup folder and update");
+    $("sync-change").style.display = folder && !running ? "" : "none";
+  }
+
+  var fetchJson = function (url) {
+    return fetch(url, { credentials: "same-origin", cache: "no-store" }).then(function (r) {
+      if (!r.ok) throw new Error("The portal answered " + r.status);
+      return r.json();
+    });
+  };
+  var api = {
+    manifest: function () { return fetchJson(card.dataset.manifest); },
+    file: function (name, signal) {
+      return fetch(card.dataset.file + "?name=" + encodeURIComponent(name), { credentials: "same-origin", cache: "no-store", signal: signal })
+        .then(function (r) { if (!r.ok) throw new Error("The portal answered " + r.status); return r; });
+    },
+    database: function () { return fetch(card.dataset.database, { credentials: "same-origin", cache: "no-store" }); },
+    code: function () { return fetch(card.dataset.code, { credentials: "same-origin", cache: "no-store" }); },
+  };
+
+  async function choose() {
+    folder = await window.showDirectoryPicker({ mode: "readwrite", id: "abc-backup" });
+    await setFolder(folder);
+    show();
+  }
+
+  async function update() {
+    if (running) return;
+    try {
+      if (!folder) await choose();
+      var permission = await folder.requestPermission({ mode: "readwrite" });
+      if (permission !== "granted") { $("sync-result").innerHTML = '<div class="alert alert-error">The browser did not allow saving into that folder.</div>'; return; }
+    } catch (error) {
+      if (error && error.name === "AbortError") return;               // closed the folder window
+      $("sync-result").innerHTML = '<div class="alert alert-error"></div>';
+      $("sync-result").firstChild.textContent = "Could not use that folder: " + (error.message || error);
+      return;
+    }
+    running = true; controller = new AbortController();
+    $("sync-go").disabled = true; $("sync-cancel").style.display = ""; $("sync-change").style.display = "none";
+    $("sync-progress").style.display = ""; $("sync-result").textContent = "";
+    var wake = null;
+    try { wake = navigator.wakeLock && await navigator.wakeLock.request("screen"); } catch (e) { /* optional */ }
+    window.onbeforeunload = function () { return "A backup update is still running."; };
+
+    var plan = { bytes: 0 };
+    var onProgress = function (event) {
+      if (event.type === "status") $("sync-status").textContent = event.text;
+      if (event.type === "plan") {
+        plan = event;
+        $("sync-status").textContent = event.todo + " new or changed file" + (event.todo === 1 ? "" : "s") + " (" + human(event.bytes) + ")" +
+          (event.moved ? ", " + event.moved + " now old version" + (event.moved === 1 ? "" : "s") : "") +
+          (event.removed ? ", " + event.removed + " deleted in the portal" : "") + ".";
+      }
+      if (event.type === "file") $("sync-status").textContent = "Saving " + event.index + " of " + event.of + ": " + event.name;
+      if (event.type === "bytes") {
+        var percent = event.totalBytes ? Math.min(100, Math.round(event.doneBytes * 100 / event.totalBytes)) : 100;
+        $("sync-bar").style.width = percent + "%"; $("sync-percent").textContent = percent + "%";
+      }
+    };
+    try {
+      var summary = await Sync.runSync({ root: folder, api: api, onProgress: onProgress, signal: controller.signal, concurrency: 3, includeOld: $("sync-old").checked });
+      $("sync-bar").style.width = "100%"; $("sync-percent").textContent = "100%";
+      var box = $("sync-result");
+      if (summary.failed.length) {
+        box.innerHTML = '<div class="alert alert-error"><b></b><ul style="margin:6px 0 0; padding-left:18px;"></ul></div>';
+        box.querySelector("b").textContent = summary.failed.length + " file(s) could not be saved. Click Update again to retry them.";
+        summary.failed.slice(0, 8).forEach(function (f) { var li = document.createElement("li"); li.textContent = f.name + " — " + f.error; box.querySelector("ul").appendChild(li); });
+      } else {
+        box.innerHTML = '<div class="alert alert-success"></div>';
+        box.firstChild.textContent = "Finished. " + summary.downloaded + " file" + (summary.downloaded === 1 ? "" : "s") + " saved (" + human(summary.downloadedBytes) + "), " +
+          (summary.moved ? summary.moved + " moved to _old_versions, " : "") + summary.removed + " deleted ones set aside, database saved" +
+          (summary.codeUpdated ? ", code saved" : "") + "." +
+          (summary.skippedOld ? " Not copied: " + summary.skippedOld + " old version" + (summary.skippedOld === 1 ? "" : "s") + " (" + human(summary.skippedOldBytes) + ") that the portal no longer uses. Tick \u201cAlso keep old versions\u201d to include them." : "");
+        fetch(card.dataset.done, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
+          body: JSON.stringify({ total: summary.total, downloaded: summary.downloaded, downloaded_bytes: summary.downloadedBytes, removed: summary.removed,
+                                 code_updated: summary.codeUpdated, code_fingerprint: summary.codeFingerprint }) }).catch(function () {});
+      }
+    } catch (error) {
+      $("sync-result").innerHTML = '<div class="alert alert-error"></div>';
+      $("sync-result").firstChild.textContent = error.message || String(error);
+    } finally {
+      running = false; window.onbeforeunload = null;
+      if (wake && wake.release) wake.release().catch(function () {});
+      $("sync-go").disabled = false; $("sync-cancel").style.display = "none"; show("Update backup");
+    }
+  }
+
+  $("sync-go").addEventListener("click", update);
+  $("sync-change").addEventListener("click", function () { choose().then(function () { return update(); }).catch(function () {}); });
+  $("sync-cancel").addEventListener("click", function () { if (controller) controller.abort(); });
+  getFolder().then(function (handle) { folder = handle || null; show(); });
+})();
+</script>
+{% endblock %}

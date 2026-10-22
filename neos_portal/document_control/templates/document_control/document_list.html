@@ -1,0 +1,104 @@
+{% extends "core/base.html" %}
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center;">
+  <h1>Document Controller</h1>
+  {% if user.profile.can_edit %}
+  <div style="display:flex; gap:8px;">
+    <a data-modal class="btn" href="{% url 'document_control:type_manage' %}">Manage document types</a>
+    <a data-modal class="btn" href="{% url 'document_control:publisher_manage' %}">Manage publishers</a>
+    <button type="button" class="btn btn-primary" onclick="document.getElementById('new-document-modal').showModal()">+ New document</button>
+  </div>
+  {% endif %}
+</div>
+
+
+<form method="get" class="filter-bar">
+  <input type="text" name="q" placeholder="Search name or document number..." value="{{ q }}">
+  <select name="type" onchange="this.form.submit()">
+    <option value="">All types</option>
+    {% for dt in document_types %}
+    <option value="{{ dt.pk }}" {% if doc_type == dt.pk|stringformat:"s" %}selected{% endif %}>{{ dt.name }}</option>
+    {% endfor %}
+  </select>
+  <select name="sort" onchange="this.form.submit()">
+    <option value="date" {% if sort == "date" %}selected{% endif %}>Date of Issue (newest first)</option>
+    <option value="date_asc" {% if sort == "date_asc" %}selected{% endif %}>Date of Issue (oldest first)</option>
+    <option value="name" {% if sort == "name" %}selected{% endif %}>Name (A-Z)</option>
+    <option value="-name" {% if sort == "-name" %}selected{% endif %}>Name (Z-A)</option>
+    <option value="number" {% if sort == "number" %}selected{% endif %}>Document Number</option>
+    <option value="type" {% if sort == "type" %}selected{% endif %}>Type</option>
+  </select>
+  <button class="btn" type="submit">Filter</button>
+</form>
+
+<div class="table-wrap">
+<table class="data-table">
+  <tr><th>Document Number</th><th>Name</th><th>Type</th><th>Version</th><th>Published By</th><th>Date of Issue</th><th>File</th><th></th></tr>
+  {% for doc in documents %}
+  <tr>
+    <td>{{ doc.document_number|default:"—" }}</td>
+    <td>{{ doc.name }}</td>
+    <td>{% if doc.document_type %}<span class="pill">{{ doc.document_type.name }}</span>{% else %}—{% endif %}</td>
+    <td>{{ doc.version|default:"—" }}</td>
+    <td>{% if doc.published_by %}{{ doc.published_by.name }}{% else %}—{% endif %}</td>
+    <td>{{ doc.date_of_issue|default:"—" }}</td>
+    <td>
+      {% if user.profile.can_download %}
+        {% if doc.file %}<a href="{% url 'document_control:download' doc.pk %}" target="_blank">Download</a>{% else %}—{% endif %}
+      {% else %}
+        <span class="page-sub">Restricted</span>
+      {% endif %}
+    </td>
+    <td>
+      {% if user.profile.can_edit %}<a data-modal class="btn" href="{% url 'document_control:edit' doc.pk %}">Edit</a>{% endif %}
+      {% if user.profile.can_delete %}<a class="btn" href="{% url 'document_control:delete' doc.pk %}">Delete</a>{% endif %}
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="8">No documents yet.</td></tr>
+  {% endfor %}
+</table>
+</div>
+
+{% if user.profile.can_edit %}
+<dialog id="new-document-modal" style="border:none; border-radius:12px; padding:0; width:min(90vw, 480px);">
+  <form method="post" enctype="multipart/form-data" style="padding:24px;">
+    {% csrf_token %}
+    <h2 style="margin-top:0;">New document</h2>
+
+    <label class="page-sub" style="display:block; margin-top:12px;">{{ form.name.label }}</label>
+    {{ form.name }}
+    {% if form.name.errors %}<div class="alert alert-error">{{ form.name.errors }}</div>{% endif %}
+
+    <label class="page-sub" style="display:block; margin-top:12px;">{{ form.document_type.label }}</label>
+    {{ form.document_type }}
+    {% if form.document_type.errors %}<div class="alert alert-error">{{ form.document_type.errors }}</div>{% endif %}
+
+    <label class="page-sub" style="display:block; margin-top:12px;">{{ form.document_number.label }}</label>
+    {{ form.document_number }}
+
+    <label class="page-sub" style="display:block; margin-top:12px;">{{ form.version.label }}</label>
+    {{ form.version }}
+
+    <label class="page-sub" style="display:block; margin-top:12px;">{{ form.published_by.label }}</label>
+    {{ form.published_by }}
+
+    <label class="page-sub" style="display:block; margin-top:12px;">{{ form.date_of_issue.label }}</label>
+    {{ form.date_of_issue }}
+
+    <label class="page-sub" style="display:block; margin-top:12px;">{{ form.file.label }}</label>
+    {{ form.file }}
+    {% if form.file.errors %}<div class="alert alert-error">{{ form.file.errors }}</div>{% endif %}
+
+    <div style="margin-top:22px; display:flex; gap:8px;">
+      <button class="btn btn-primary" type="submit">Upload</button>
+      <button class="btn" type="button" onclick="document.getElementById('new-document-modal').close()">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+{% if form.errors %}
+<script>document.addEventListener("DOMContentLoaded", function() { document.getElementById('new-document-modal').showModal(); });</script>
+{% endif %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,167 @@
+{% extends "core/base.html" %}
+{% block content %}
+{% if pending_approvals %}
+<div class="approval-banner is-pending">
+  <div><b>{{ pending_approvals }} item{{ pending_approvals|pluralize }} waiting for your approval</b> <span class="cell-sub">manifests, assets, personnel, SGS reports, maintenance reports</span></div>
+  <a class="btn btn-primary" href="{% url 'approvals:inbox' %}">Review</a>
+</div>
+{% endif %}
+<div class="dash-head">
+  <div>
+    <h1>Dashboard</h1>
+    <p class="page-sub" style="margin:0;">What is happening across the portal &middot; {{ today|date:"l, j F Y" }}</p>
+  </div>
+</div>
+
+{# ── who has the portal open right now ── #}
+<div class="online-strip" id="online-strip">
+  <span class="online-title"><span class="online-dot"></span> Online now <b>{{ online_people|length }}</b></span>
+  {% for p in online_people %}<span class="online-chip" title="{{ p.get_role_display }}"><span class="online-dot"></span>{{ p.display_name }}</span>{% empty %}<span class="cell-sub">nobody else right now</span>{% endfor %}
+</div>
+
+{# ── headline numbers ── #}
+<div class="kpi-grid">
+  <a class="kpi kpi-{% if not equipment.total %}info{% elif equipment.expired %}bad{% elif equipment.soon %}warn{% else %}good{% endif %}" href="{% url 'departments:list' %}">
+    <div class="kpi-label">Equipment certificates OK</div>
+    <div class="kpi-value">{% if equipment.total %}{{ equipment.percent_ok }}<small>%</small>{% else %}&mdash;{% endif %}</div>
+    <div class="kpi-note">{% if equipment.total %}{{ equipment.expired }} expired &middot; {{ equipment.soon }} expiring soon{% else %}no certificates recorded yet{% endif %}</div>
+  </a>
+  <a class="kpi kpi-{% if not people.total %}info{% elif people.expired %}bad{% elif people.soon %}warn{% else %}good{% endif %}" href="{% url 'personnel:cert_matrix' %}">
+    <div class="kpi-label">Personnel certificates OK</div>
+    <div class="kpi-value">{% if people.total %}{{ people.percent_ok }}<small>%</small>{% else %}&mdash;{% endif %}</div>
+    <div class="kpi-note">{% if people.total %}{{ people.expired }} expired &middot; {{ people.soon }} expiring soon{% else %}no certificates recorded yet{% endif %}</div>
+  </a>
+  <a class="kpi kpi-info" href="{% url 'job_manager:list' %}">
+    <div class="kpi-label">Active jobs</div>
+    <div class="kpi-value">{{ kpis.active_jobs }}</div>
+    <div class="kpi-note">{{ kpis.jobs_total }} job{{ kpis.jobs_total|pluralize }} in total</div>
+  </a>
+  <a class="kpi kpi-{% if kpis.overdue_actions %}bad{% elif kpis.open_actions %}warn{% else %}good{% endif %}" href="{% url 'action_tracker:list' %}">
+    <div class="kpi-label">Open actions</div>
+    <div class="kpi-value">{{ kpis.open_actions }}</div>
+    <div class="kpi-note">{% if kpis.overdue_actions %}{{ kpis.overdue_actions }} overdue{% else %}none overdue{% endif %}</div>
+  </a>
+  <a class="kpi kpi-info" href="{% url 'departments:list' %}">
+    <div class="kpi-label">Equipment out on jobs</div>
+    <div class="kpi-value">{{ kpis.away }}</div>
+    <div class="kpi-note">{{ kpis.at_workshop }} at the workshop &middot; {{ kpis.assets }} total</div>
+  </a>
+  <a class="kpi kpi-{% if kpis.reports_open %}warn{% else %}good{% endif %}" href="{% url 'sgs_report:list' %}">
+    <div class="kpi-label">SGS reports still open</div>
+    <div class="kpi-value">{{ kpis.reports_open }}</div>
+    <div class="kpi-note">{{ kpis.reports_total }} report{{ kpis.reports_total|pluralize }} in total</div>
+  </a>
+</div>
+
+{# ── certificate health + attention list ── #}
+<div class="dash-row dash-row-main">
+  <div class="dash-card">
+    <h3>Certificate health</h3>
+    <div class="donut-pair">
+      <div class="donut-block">
+        <div class="donut" style="background: {{ equipment_donut }};"><div class="donut-hole">{% if equipment.total %}<b>{{ equipment.percent_ok }}%</b><span>valid</span>{% else %}<span>no data</span>{% endif %}</div></div>
+        <div class="donut-title">Equipment</div>
+        <ul class="legend">
+          <li><i style="background:var(--success)"></i>{{ equipment.valid }} valid</li>
+          <li><i style="background:var(--warning)"></i>{{ equipment.soon }} expiring soon</li>
+          <li><i style="background:var(--danger)"></i>{{ equipment.expired }} expired</li>
+          <li><i style="background:var(--text-muted)"></i>{{ equipment.missing }} no date</li>
+        </ul>
+      </div>
+      <div class="donut-block">
+        <div class="donut" style="background: {{ people_donut }};"><div class="donut-hole">{% if people.total %}<b>{{ people.percent_ok }}%</b><span>valid</span>{% else %}<span>no data</span>{% endif %}</div></div>
+        <div class="donut-title">Personnel</div>
+        <ul class="legend">
+          <li><i style="background:var(--success)"></i>{{ people.valid }} valid</li>
+          <li><i style="background:var(--warning)"></i>{{ people.soon }} expiring soon</li>
+          <li><i style="background:var(--danger)"></i>{{ people.expired }} expired</li>
+          <li><i style="background:var(--text-muted)"></i>{{ people.missing }} no date</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-card">
+    <h3>Needs attention <span class="dash-count">{{ attention_total }}</span></h3>
+    <p class="dash-sub">Already overdue, or due within 30 days &mdash; equipment and personnel certificates, work approvals and maintenance.</p>
+    {% if attention %}
+    <ul class="attn-list">
+      {% for item in attention %}
+      <li>
+        <a href="{{ item.url }}">
+          <span class="attn-kind">{{ item.kind }}</span>
+          <span class="attn-label">{{ item.label }}</span>
+          <span class="pill {% if item.overdue %}expired{% else %}soon{% endif %}">{% if item.overdue %}{{ item.days_abs }} day{{ item.days_abs|pluralize }} overdue{% elif item.days == 0 %}today{% else %}in {{ item.days }} day{{ item.days|pluralize }}{% endif %}</span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+    {% if attention_total > 10 %}<p class="dash-sub" style="margin:10px 0 0;">Showing the 10 most urgent of {{ attention_total }}.</p>{% endif %}
+    {% else %}
+    <div class="dash-empty">Nothing is overdue or due in the next 30 days.</div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── breakdowns ── #}
+<div class="dash-row dash-row-3">
+  <div class="dash-card">
+    <h3>Jobs by status</h3>
+    {% for b in jobs_bars %}
+    <div class="bar-row"><span class="bar-label">{{ b.label }}</span><div class="bar-track"><div class="bar-fill" style="width:{{ b.width }}%; background:{{ b.colour }};"></div></div><span class="bar-count">{{ b.count }}</span></div>
+    {% endfor %}
+    <h3 style="margin-top:22px;">SGS reports</h3>
+    {% for b in reports_bars %}
+    <div class="bar-row"><span class="bar-label">{{ b.label }}</span><div class="bar-track"><div class="bar-fill" style="width:{{ b.width }}%; background:{{ b.colour }};"></div></div><span class="bar-count">{{ b.count }}</span></div>
+    {% endfor %}
+  </div>
+
+  <div class="dash-card">
+    <h3>Where the equipment is</h3>
+    {% for b in location_bars %}
+    <div class="bar-row"><span class="bar-label" title="{{ b.label }}">{{ b.label }}</span><div class="bar-track"><div class="bar-fill" style="width:{{ b.width }}%; background:{% if b.label == 'Workshop' %}var(--success){% else %}var(--accent){% endif %};"></div></div><span class="bar-count">{{ b.count }}</span></div>
+    {% empty %}
+    <div class="dash-empty">No equipment recorded yet.</div>
+    {% endfor %}
+    <p class="dash-sub" style="margin-top:14px;">Anything not at the workshop is out on a job and unavailable for new manifests until it is returned.</p>
+  </div>
+
+  <div class="dash-card">
+    <h3>Actions</h3>
+    {% for b in actions_bars %}
+    <div class="bar-row"><span class="bar-label">{{ b.label }}</span><div class="bar-track"><div class="bar-fill" style="width:{{ b.width }}%; background:{{ b.colour }};"></div></div><span class="bar-count">{{ b.count }}</span></div>
+    {% endfor %}
+    {% if open_action_list %}
+    <h3 style="margin-top:22px;">Next to do</h3>
+    <ul class="mini-list">
+      {% for a in open_action_list %}
+      <li><a href="{% url 'action_tracker:detail' a.pk %}">{{ a.action_item|truncatechars:38 }}</a>
+        <span class="mini-meta">{% if a.assignee %}{{ a.assignee }} &middot; {% endif %}{% if a.due_date %}due {{ a.due_date|date:"j M" }}{% else %}no due date{% endif %}</span></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+</div>
+
+{# ── recent ── #}
+<div class="dash-row dash-row-2">
+  <div class="dash-card">
+    <h3>Latest jobs</h3>
+    <ul class="mini-list">
+      {% for j in recent_jobs %}
+      <li><a href="{% url 'job_manager:detail' j.pk %}">{{ j.job_name }}</a>
+        <span class="mini-meta">{{ j.client|default:"no client" }}{% if j.location %} &middot; {{ j.location }}{% endif %} &middot; <span class="pill {% if j.status == 'Completed' %}valid{% elif j.status == 'Active' %}soon{% endif %}">{{ j.status }}</span></span></li>
+      {% empty %}<li class="dash-empty">No jobs yet.</li>{% endfor %}
+    </ul>
+  </div>
+  <div class="dash-card">
+    <h3>Latest SGS reports</h3>
+    <ul class="mini-list">
+      {% for r in recent_reports %}
+      <li><a href="{% url 'sgs_report:detail' r.pk %}">{{ r.well_name }}</a>
+        <span class="mini-meta">{{ r.client|default:"no client" }} &middot; {{ r.created_at|date:"j M Y" }} &middot; <span class="pill {% if r.status == 'Approved' %}valid{% elif r.status == 'Sent' %}soon{% endif %}">{{ r.status }}</span></span></li>
+      {% empty %}<li class="dash-empty">No reports yet.</li>{% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}
